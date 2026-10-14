@@ -18,24 +18,52 @@
  */
 package org.isoron.uhabits.tasks
 
-import android.util.Log
+import org.isoron.platform.io.JavaUserFile
 import org.isoron.platform.io.UserFile
 import org.isoron.platform.io.begin
 import org.isoron.platform.io.commit
 import org.isoron.uhabits.core.io.GenericImporter
+import org.isoron.uhabits.core.io.Logging
 import org.isoron.uhabits.core.models.ModelFactory
 import org.isoron.uhabits.core.models.sqlite.SQLModelFactory
 import org.isoron.uhabits.core.tasks.Task
+import java.io.File
+import java.io.IOException
+import java.io.InputStream
 
 class ImportDataTask(
     private val importer: GenericImporter,
     modelFactory: ModelFactory,
-    private val file: UserFile,
+    private val openSource: () -> InputStream?,
+    private val tempDir: () -> File?,
+    logging: Logging,
     private val listener: Listener
 ) : Task {
+    private val logger = logging.getLogger("ImportDataTask")
     private var result = 0
     private val modelFactory: SQLModelFactory = modelFactory as SQLModelFactory
     override suspend fun doInBackground() {
+        var tempFile: File? = null
+        try {
+            tempFile = File.createTempFile("import", "", tempDir())
+            copySourceTo(tempFile)
+            importFile(JavaUserFile(tempFile.toPath()))
+        } catch (e: Exception) {
+            result = FAILED
+            logger.error(e)
+        } finally {
+            tempFile?.delete()
+        }
+    }
+
+    private fun copySourceTo(file: File) {
+        val source = openSource() ?: throw IOException("Could not open import source")
+        source.use { input ->
+            file.outputStream().use { output -> input.copyTo(output) }
+        }
+    }
+
+    private suspend fun importFile(file: UserFile) {
         modelFactory.database.begin()
         try {
             if (importer.canHandle(file)) {
@@ -48,7 +76,7 @@ class ImportDataTask(
             }
         } catch (e: Exception) {
             result = FAILED
-            Log.e("ImportDataTask", "Import failed", e)
+            logger.error(e)
             // On failure, commit anyway to close the transaction
             try { modelFactory.database.commit() } catch (_: Exception) {}
         }

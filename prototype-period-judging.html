@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE: period judging</title>
+<!--
+  PROTOTYPE, throwaway. Answers issue #31: when does a habit count as "done" for a day
+  when its target or frequency covers a week or a month?
+  Lives only on branch prototype/period-judging. Never merge into main.
+  The <script id="period-judging-logic"> block is the pure, liftable logic; the rest is a shell.
+-->
+<style>
+  :root {
+    --bg: #fbfbfa; --fg: #1d1d1f; --muted: #6b6b70; --line: #e2e2e4; --panel: #ffffff;
+    --accent: #0b7a75; --accent-soft: #a9d8d4; --future: #f0f0f1; --bad: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1400px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  .badge { display: inline-block; background: var(--bad); color: #fff; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-right: 6px; }
+  .lede { color: var(--muted); max-width: 900px; margin: 4px 0 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+  .grow { flex: 1 1 380px; min-width: 0; }
+  label { color: var(--muted); font-size: 12px; display: inline-flex; flex-direction: column; gap: 2px; margin-right: 12px; margin-bottom: 8px; }
+  input, select, button { font: inherit; }
+  input, select { padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--fg); }
+  input[type=number] { width: 80px; }
+  button { border: 1px solid var(--line); background: #fff; border-radius: 5px; padding: 4px 10px; cursor: pointer; color: var(--fg); }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .controls { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: flex-end; }
+  .seg { display: inline-flex; }
+  .seg button { border-radius: 0; margin-left: -1px; }
+  .seg button:first-child { border-radius: 5px 0 0 5px; margin-left: 0; }
+  .seg button:last-child { border-radius: 0 5px 5px 0; }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+  .steps { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .steps button.next { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .expect { font-size: 13px; margin-top: 8px; }
+  .expect td { padding: 2px 10px 2px 0; vertical-align: top; }
+  .flash { color: var(--accent); font-weight: 600; min-height: 1.4em; }
+  .habits button { display: block; width: 100%; text-align: left; margin-bottom: 4px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .scroll { overflow-x: auto; }
+  table.tl { border-collapse: collapse; font-size: 11px; }
+  table.tl th, table.tl td { width: 26px; min-width: 26px; height: 24px; text-align: center; padding: 0; border: 1px solid #f1f1f2; }
+  table.tl th.lbl, table.tl td.lbl { width: auto; min-width: 210px; text-align: left; padding: 0 8px; white-space: nowrap; border: none; font-size: 12px; }
+  table.tl td.lbl.sub { color: var(--muted); padding-left: 20px; }
+  table.tl tr.group td { border-top: 2px solid var(--line); }
+  table.tl .wk { border-left: 2px solid #c9c9cd; }
+  table.tl .today { outline: 2px solid var(--fg); outline-offset: -2px; }
+  table.tl .future { background: var(--future); color: #b6b6ba; }
+  .entered { background: var(--accent); color: #fff; }
+  .filled { background: var(--accent-soft); }
+  .skip { background: repeating-linear-gradient(45deg, var(--accent-soft) 0 3px, #fff 3px 6px); }
+  .pending { box-shadow: inset 0 0 0 2px var(--accent); background: repeating-linear-gradient(90deg, #fff 0 4px, #e8f4f3 4px 8px); }
+  .click { cursor: pointer; }
+  .click:hover { background: #fff7d6; }
+  .legend span.sw { display: inline-block; width: 14px; height: 14px; vertical-align: -3px; margin: 0 4px 0 12px; border: 1px solid var(--line); }
+  .grid { display: grid; grid-template-columns: repeat(7, minmax(44px, 1fr)); gap: 3px; max-width: 420px; }
+  .grid div { border: 1px solid var(--line); border-radius: 4px; min-height: 40px; padding: 2px 4px; font-size: 11px; background: #fff; }
+  .grid div.hd { border: none; min-height: 0; text-align: center; color: var(--muted); background: none; }
+  .grid div .v { font-size: 14px; font-weight: 600; text-align: center; }
+  .grid div.future { background: var(--future); color: #b6b6ba; }
+  .grid div.today { outline: 2px solid var(--fg); }
+  .cards { display: flex; gap: 12px; flex-wrap: wrap; }
+  .card { flex: 1 1 220px; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+  .card h3 { margin: 0 0 6px; font-size: 13px; }
+  .card ol { margin: 0; padding-left: 18px; }
+  table.data { border-collapse: collapse; font-size: 13px; }
+  table.data th, table.data td { border-bottom: 1px solid var(--line); padding: 4px 10px; text-align: left; }
+  .yes { color: var(--accent); font-weight: 600; }
+  .no { color: var(--bad); font-weight: 600; }
+  .na { color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span class="badge">PROTOTYPE</span>When is a weekly or monthly habit "done"?</h1>
+  <p class="lede">
+    <b>The question (#31):</b> when a habit's target or frequency covers a week or a month, which days count as done for
+    streaks, "completed today", the calendar and reminders? Each variant below reads <i>the same entries</i> and judges them
+    its own way: today's app code, <b>A</b> calendar periods, <b>B</b> a rolling window like the score, and <b>C</b> the
+    yes-or-no Yes (auto) model applied to amounts. Yes-or-no habits show today's code (the faithful Yes (auto) port) next to
+    calendar periods. Nothing is saved: reload and it's gone.
+  </p>
+  <div id="walk" class="panel"></div>
+  <div id="settings" class="panel"></div>
+  <div class="row">
+    <div class="panel" style="flex: 0 0 230px"><h2>Habits</h2><div id="habits"></div></div>
+    <div class="panel grow" id="editor"></div>
+    <div class="panel" style="flex: 0 1 460px"><h2>Enter values</h2><div id="grid"></div>
+      <p class="muted small">Click a day. Yes-or-no cycles Yes → No → Skip → Unknown. Measurable asks for an amount
+      (<code>s</code> = skip, empty = unknown). Days after today can't be edited.</p></div>
+  </div>
+  <div id="state"></div>
+</main>
+
+<script id="period-judging-logic">
+// ===== PURE LOGIC: no DOM. Lift this block into the real code once the question is settled. =====
+const PJ = (() => {
+  // Entry values, as in Entry.kt
+  const UNKNOWN = -1, NO = 0, YES_AUTO = 1, YES_MANUAL = 2, SKIP = 3;
+
+  // ---- Dates are whole days since 1970-01-01 (UTC) ----
+  const MS = 86400000;
+  const day = (y, m, d) => Math.round(Date.UTC(y, m - 1, d) / MS);
+  const ymd = n => { const t = new Date(n * MS); return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() }; };
+  const iso = n => new Date(n * MS).toISOString().slice(0, 10);
+  const fromIso = s => { const [y, m, d] = s.split('-').map(Number); return day(y, m, d); };
+  const dow = n => (((n + 4) % 7) + 7) % 7; // 0 = Sunday
+  const monthLength = n => { const { y, m } = ymd(n); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
+  const startOfWeek = (n, firstDow) => n - ((dow(n) - firstDow + 7) % 7);
+  const startOfMonth = n => n - ymd(n).d + 1;
+  const startOfQuarter = n => { const { y, m } = ymd(n); return day(y, m - ((m - 1) % 3), 1); };
+  const startOfYear = n => day(ymd(n).y, 1, 1);
+
+  // ---- Habit access ----
+  // habit = { kind: 'yesno'|'measurable', num, den, targetType: 'atLeast'|'atMost', target, unit, entries: { day: 'Y'|'N'|'S'|number } }
+  const isMeasurable = h => h.kind === 'measurable';
+  const isAtMost = h => isMeasurable(h) && h.targetType === 'atMost';
+  function rawValue(h, d) {
+    const e = h.entries[d];
+    if (e === undefined) return UNKNOWN;
+    if (!isMeasurable(h)) return e === 'Y' ? YES_MANUAL : e === 'N' ? NO : SKIP;
+    return e === 'S' ? SKIP : Math.round(e * 1000);
+  }
+  const amount = (h, d) => (typeof h.entries[d] === 'number' ? h.entries[d] : 0);
+  const knownDates = (h, upTo) => Object.keys(h.entries).map(Number).filter(d => d <= upTo).sort((a, b) => b - a); // newest first
+
+  // ---- Faithful port of EntryList.kt (yes-or-no Yes (auto)) ----
+  function intervalSize(den, begin) {
+    if (den === 30 || den === 31) return ymd(begin).d === monthLength(begin) ? monthLength(begin + 1) : monthLength(begin);
+    return den;
+  }
+  function buildIntervals(num, den, entries /* newest first */) {
+    const filtered = entries.filter(e => e.value === YES_MANUAL);
+    const out = [];
+    for (let i = num - 1; i < filtered.length; i++) {
+      const begin = filtered[i].date, center = filtered[i - num + 1].date;
+      const size = intervalSize(den, begin);
+      if (center - begin < size) out.push({ begin, center, end: begin + size - 1 });
+    }
+    return out;
+  }
+  function snapIntervalsTogether(intervals) {
+    for (let i = 1; i < intervals.length; i++) {
+      const curr = intervals[i], next = intervals[i - 1];
+      const gapNextToCurrent = curr.end - next.begin;
+      const gapCenterToEnd = curr.end - curr.center;
+      if (gapNextToCurrent >= 0) {
+        const shift = Math.min(gapCenterToEnd, gapNextToCurrent + 1);
+        intervals[i] = { begin: curr.begin - shift, center: curr.center, end: curr.end - shift };
+      }
+    }
+  }
+  function buildEntriesFromInterval(original, intervals) {
+    const res = new Map();
+    if (original.length === 0) return res;
+    for (const iv of intervals) for (let d = iv.begin; d <= iv.end; d++) res.set(d, YES_AUTO);
+    for (const e of original) {
+      const cur = res.has(e.date) ? res.get(e.date) : UNKNOWN;
+      // Note: a No inside an interval becomes Yes (auto), exactly as in the app.
+      res.set(e.date, cur === UNKNOWN || e.value === SKIP || e.value === YES_MANUAL ? e.value : YES_AUTO);
+    }
+    return res;
+  }
+  /** Habit.computedEntries, using only entries up to `asOf`. */
+  function computeEntries(h, asOf) {
+    const original = knownDates(h, asOf).map(d => ({ date: d, value: rawValue(h, d) }));
+    if (isMeasurable(h)) return new Map(original.map(e => [e.date, e.value]));
+    const intervals = buildIntervals(h.num, h.den, original);
+    snapIntervalsTogether(intervals);
+    return buildEntriesFromInterval(original, intervals);
+  }
+  /** Habit.recompute's range: oldest computed entry .. today + 30. */
+  function appRange(computed, today) {
+    const to = today + 30;
+    let from = computed.size ? Math.min(...computed.keys()) : today;
+    if (from > to) from = to;
+    return { from, to };
+  }
+
+  // ---- Score: port of ScoreList.recompute + Score.compute ----
+  const scoreStep = (freq, prev, v) => { const mult = Math.pow(0.5, Math.sqrt(freq) / 13); return prev * mult + v * (1 - mult); };
+  function scores(h, today) {
+    const computed = computeEntries(h, today);
+    const { from, to } = appRange(computed, today);
+    const isNum = isMeasurable(h), atMost = isAtMost(h), target = h.target;
+    let num = h.num, den = h.den;
+    const freq = h.num / h.den;
+    if (!isNum && freq < 1) { num *= 2; den *= 2; }
+    let prev = isNum && atMost ? 1 : 0, rolling = 0;
+    const vals = [], out = new Map();
+    for (let i = 0; from + i <= to; i++) {
+      const v = computed.has(from + i) ? computed.get(from + i) : UNKNOWN;
+      vals.push(v);
+      if (isNum) {
+        rolling += Math.max(0, v);
+        if (i - den >= 0) rolling -= Math.max(0, vals[i - den]);
+        const n = rolling / 1000;
+        if (v !== SKIP) {
+          const pc = !atMost
+            ? (target > 0 ? Math.min(1, n / target) : 1)
+            : (target > 0 ? Math.min(1, Math.max(0, 1 - (n - target) / target)) : (n > 0 ? 0 : 1));
+          prev = scoreStep(freq, prev, pc);
+        }
+      } else {
+        if (v === YES_MANUAL) rolling += 1;
+        if (i - den >= 0 && vals[i - den] === YES_MANUAL) rolling -= 1;
+        if (v !== SKIP) prev = scoreStep(freq, prev, Math.min(1, rolling / num));
+      }
+      out.set(from + i, prev);
+    }
+    return out;
+  }
+
+  // ---- Shared helpers for the variants ----
+  function periodStart(h, d, s) {
+    if (h.den === 1) return d;
+    if (h.den === 7) return startOfWeek(d, s.firstDow);
+    if (h.den === 30 || h.den === 31) return startOfMonth(d);
+    return null;
+  }
+  function periodEnd(h, start) {
+    if (h.den === 1) return start;
+    if (h.den === 7) return start + 6;
+    return start + monthLength(start) - 1;
+  }
+  const periodWord = h => (h.den === 1 ? 'day' : h.den === 7 ? 'week' : 'month');
+  const metAmount = (h, total) => (h.targetType === 'atMost' ? total <= h.target : total >= h.target);
+  /** How a counted day looks: the user's own entry (solid), filled in (light), or skip (hatched). */
+  function ownLook(h, d) {
+    const e = h.entries[d];
+    if (e === 'S') return 'skip';
+    if (!isMeasurable(h)) return e === 'Y' ? 'entered' : 'filled';
+    if (typeof e !== 'number') return 'filled';
+    return h.targetType === 'atMost' || e > 0 ? 'entered' : 'filled';
+  }
+  /** Decision 4: "completed today" for "at most" habits. */
+  function atMostCompleted(h, s, today, underCap) {
+    if (s.atMostCompleted === 'never') return false;
+    if (s.atMostCompleted === 'entered') return h.entries[today] !== undefined && underCap;
+    return underCap;
+  }
+
+  // ---- Variants. Each returns { days: Map(day -> look), from, to, completed, note?, na?, periods? } ----
+  function todaysCode(h, s, today) {
+    const computed = computeEntries(h, today);
+    const { from, to } = appRange(computed, today);
+    const get = d => (computed.has(d) ? computed.get(d) : UNKNOWN);
+    const days = new Map();
+    for (let d = from; d <= to; d++) {
+      const v = get(d);
+      if (isMeasurable(h)) {
+        const ok = h.targetType === 'atLeast' ? v / 1000 >= h.target : v !== UNKNOWN && v / 1000 <= h.target;
+        if (ok) days.set(d, v === SKIP ? 'skip' : 'entered');
+      } else if (v > 0) {
+        days.set(d, v === YES_MANUAL ? 'entered' : v === SKIP ? 'skip' : 'filled');
+      }
+    }
+    const tv = get(today);
+    const completed = isMeasurable(h)
+      ? (h.targetType === 'atLeast' ? tv / 1000 >= h.target : false)
+      : tv !== NO && tv !== UNKNOWN;
+    return { days, from, to, completed };
+  }
+
+  function calendarPeriods(h, s, today) {
+    if (periodStart(h, today, s) === null) return { na: 'Calendar periods need a frequency per day, week or month.', days: new Map() };
+    const known = knownDates(h, today);
+    const days = new Map(), periods = [];
+    if (!known.length) return { days, from: today, to: today, completed: false, periods };
+    const from = Math.min(...known);
+    let current = null;
+    for (let p = periodStart(h, from, s); p <= today; p = periodEnd(h, p) + 1) {
+      const end = periodEnd(h, p), last = Math.min(end, today);
+      let total = 0;
+      for (let d = p; d <= last; d++) total += isMeasurable(h) ? amount(h, d) : (h.entries[d] === 'Y' ? 1 : 0);
+      const target = isMeasurable(h) ? h.target : h.num;
+      const met = isMeasurable(h) ? metAmount(h, total) : total >= h.num;
+      const isCurrent = end >= today;
+      const holds = isCurrent && !met && s.currentPeriod === 'hold' && !isAtMost(h) && h.den !== 1;
+      for (let d = Math.max(p, from); d <= last; d++) {
+        if (met) days.set(d, ownLook(h, d));
+        else if (holds) days.set(d, 'pending');
+        else if (!isMeasurable(h) && h.entries[d] === 'S') days.set(d, 'skip');
+      }
+      const period = { start: p, end, total, target, met, isCurrent };
+      periods.push(period);
+      if (isCurrent) current = period;
+    }
+    let completed;
+    if (!isMeasurable(h)) completed = current.met || h.entries[today] === 'S';
+    else if (isAtMost(h)) completed = atMostCompleted(h, s, today, current.met);
+    else completed = current.met;
+    return { days, from, to: today, completed, periods };
+  }
+
+  function rollingWindow(h, s, today) {
+    const known = knownDates(h, today);
+    const days = new Map();
+    if (!known.length) return { days, from: today, to: today, completed: false };
+    const from = Math.min(...known);
+    let metToday = false;
+    for (let d = from; d <= today; d++) {
+      let total = 0;
+      for (let k = d - h.den + 1; k <= d; k++) total += amount(h, k);
+      const met = metAmount(h, total);
+      if (met) days.set(d, ownLook(h, d));
+      if (d === today) metToday = met;
+    }
+    const completed = isAtMost(h) ? atMostCompleted(h, s, today, metToday) : metToday;
+    return { days, from, to: today, completed };
+  }
+
+  function likeYesOrNo(h, s, today) {
+    if (isAtMost(h)) return { ...rollingWindow(h, s, today), note: 'n/a for "at most": showing B' };
+    const known = knownDates(h, today).filter(d => amount(h, d) > 0); // newest first
+    const intervals = [];
+    for (const b of known) {
+      const size = intervalSize(h.den, b);
+      let sum = 0;
+      for (let d = b; d <= today && d < b + size; d++) {
+        sum += amount(h, d);
+        if (sum >= h.target) { intervals.push({ begin: b, center: d, end: b + size - 1 }); break; }
+      }
+    }
+    snapIntervalsTogether(intervals);
+    const days = new Map();
+    for (const iv of intervals) for (let d = iv.begin; d <= Math.min(iv.end, today); d++) days.set(d, ownLook(h, d));
+    const starts = [...known, ...intervals.map(iv => iv.begin)];
+    const from = starts.length ? Math.min(...starts) : today;
+    return { days, from, to: today, completed: days.has(today) };
+  }
+
+  const VARIANTS = {
+    today: { label: "Today's code", fn: todaysCode },
+    A: { label: 'A · calendar periods', fn: calendarPeriods },
+    B: { label: 'B · rolling window', fn: rollingWindow },
+    C: { label: 'C · like yes-or-no', fn: likeYesOrNo },
+  };
+  const variantsFor = h => (isMeasurable(h) ? ['today', 'A', 'B', 'C'] : ['today', 'A']);
+  const judge = (h, s, today, key) => VARIANTS[key].fn(h, s, today);
+
+  /** Streaks, newest first, like StreakList.recompute. */
+  function streaks(result) {
+    const out = [];
+    if (result.na) return out;
+    let cur = null;
+    for (let d = result.to; d >= result.from; d--) {
+      if (!result.days.has(d)) continue;
+      if (cur && cur.begin === d + 1) cur.begin = d;
+      else { cur = { begin: d, end: d }; out.push(cur); }
+    }
+    for (const st of out) {
+      st.length = st.end - st.begin + 1;
+      if (result.periods) st.periods = result.periods.filter(p => p.end >= st.begin && p.start <= st.end).length;
+    }
+    return out;
+  }
+
+  /** Reminder rules for today. entered = the user recorded anything today. */
+  function reminders(h, s, today) {
+    const entered = h.entries[today] !== undefined;
+    const base = todaysCode(h, s, today);
+    const out = { todaysCodeFires: !(base.completed && !isAtMost(h)), enteredFires: !entered, perVariant: {} };
+    for (const key of variantsFor(h)) {
+      const r = judge(h, s, today, key);
+      if (r.na) { out.perVariant[key] = null; continue; }
+      out.perVariant[key] = { completedFires: !r.completed, eitherFires: !(entered || r.completed) };
+    }
+    return out;
+  }
+
+  /** Port of TargetCard.buildState: totals this day/week/month/quarter/year against the scaled target. */
+  function targetProgress(h, s, today) {
+    const sum = (a, b) => { let t = 0, sk = 0; for (let d = a; d <= b; d++) { t += amount(h, d); if (h.entries[d] === 'S') sk++; } return { t, sk }; };
+    const den = h.den, daily = h.target / den;
+    const wk = sum(startOfWeek(today, s.firstDow), today), mo = sum(startOfMonth(today), today);
+    const qu = sum(startOfQuarter(today), today), yr = sum(startOfYear(today), today), td = sum(today, today);
+    const yearLength = startOfYear(day(ymd(today).y + 1, 1, 1)) - startOfYear(today);
+    const weeksInMonth = Math.floor(monthLength(today) / 7);
+    const rows = [];
+    const add = (label, v, target, sk) => rows.push({ label, value: v, target: Math.max(0, target - daily * sk) });
+    if (den <= 1) add('Today', td.t, daily, td.sk);
+    if (den <= 7) add('This week', wk.t, den === 7 ? h.target : daily * 7, wk.sk);
+    add('This month', mo.t, den === 30 ? h.target : den === 7 ? h.target * weeksInMonth : daily * monthLength(today), mo.sk);
+    add('This quarter', qu.t, den === 30 ? h.target * 3 : den === 7 ? h.target * 13 : daily * 91, qu.sk);
+    add('This year', yr.t, den === 30 ? h.target * 12 : den === 7 ? h.target * 52 : daily * yearLength, yr.sk);
+    return rows;
+  }
+
+  return {
+    day, ymd, iso, fromIso, dow, monthLength, startOfWeek, startOfMonth,
+    VARIANTS, variantsFor, judge, streaks, scores, reminders, targetProgress, periodWord, isMeasurable, isAtMost,
+  };
+})();
+</script>
+
+<script>
+// ===== PAGE SHELL: throwaway. =====
+const D = PJ.day;
+const W1 = D(2026, 9, 28); // Monday of "week 1" in the walkthroughs
+const SUN_W2 = W1 + 13;
+let nextId = 1;
+const habit = (props, entries = {}) => {
+  const h = { id: nextId++, name: 'New habit', kind: 'yesno', num: 1, den: 1, targetType: 'atLeast', target: 1, unit: '', entries: {}, ...props };
+  for (const [offset, v] of Object.entries(entries)) h.entries[W1 + Number(offset)] = v;
+  return h;
+};
+
+const state = {
+  habits: [], selectedId: null, today: SUN_W2,
+  settings: { firstDow: 1, currentPeriod: 'hold', atMostCompleted: 'never' },
+  tab: 0, step: 0, flash: '',
+};
+const sel = () => state.habits.find(h => h.id === state.selectedId);
+const fmtDay = d => { const t = new Date(d * 86400000); return t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }); };
+const unitOf = h => (PJ.isMeasurable(h) ? ` ${h.unit}` : '');
+
+function load(habits, today, extra = {}) {
+  state.habits = habits;
+  state.selectedId = habits[0].id;
+  state.today = today;
+  Object.assign(state.settings, { firstDow: 1, currentPeriod: 'hold', atMostCompleted: 'never' }, extra);
+}
+const everyDay = (n, v) => Object.fromEntries(Array.from({ length: n }, (_, i) => [i, v]));
+
+const WALKS = [
+  {
+    title: 'Ex 1 · weekly, long gap',
+    desc: '"At least 10 km/week". Week 1: Mon 5, Wed 5. Week 2: only Sat 10. Today = Sunday of week 2. Both calendar weeks reach 10 km, but the days between are far apart.',
+    expect: { today: '1', A: '14', B: '2 + 5', C: '2 + 7' },
+    steps: [
+      { label: 'Load', run: () => load([habit({ name: 'Run', kind: 'measurable', den: 7, target: 10, unit: 'km' }, { 0: 5, 2: 5, 12: 10 })], SUN_W2) },
+      { label: 'Step today back to Wed of week 2', run: () => { state.today = W1 + 9; } },
+      { label: 'Current week: switch to "break now"', run: () => { state.settings.currentPeriod = 'break'; } },
+    ],
+  },
+  {
+    title: 'Ex 2 · steady',
+    desc: '"At least 10 km/week", 2 km every day for 2 weeks. Watch the "completed as seen on the day" row under A: every Monday it drops back to not done.',
+    expect: { today: 'none', A: '14', B: '10', C: '16 (snapping reaches 2 days before the first entry)' },
+    steps: [
+      { label: 'Load', run: () => load([habit({ name: 'Run', kind: 'measurable', den: 7, target: 10, unit: 'km' }, everyDay(14, 2))], SUN_W2) },
+      { label: 'Set today to Monday of week 2', run: () => { state.today = W1 + 7; } },
+      { label: 'Back to Sunday of week 2', run: () => { state.today = SUN_W2; } },
+    ],
+  },
+  {
+    title: 'Ex 3 · at most, across a week boundary',
+    desc: '"At most 4 coffees/week". 0 every day except week 1 Sun 3, week 2 Mon 2, Tue 1. Each calendar week stays under 4, but a 7-day window from Wed to Tue holds 6.',
+    expect: { today: '14', A: '14', B: 'breaks Mon–Sat of week 2', C: 'n/a → B' },
+    steps: [
+      { label: 'Load', run: () => load([habit({ name: 'Coffee', kind: 'measurable', den: 7, targetType: 'atMost', target: 4, unit: 'coffees' }, { ...everyDay(14, 0), 6: 3, 7: 2, 8: 1 })], SUN_W2) },
+      { label: '"At most" completed: when under the cap', run: () => { state.settings.atMostCompleted = 'under'; } },
+    ],
+  },
+  {
+    title: 'Ex 3b · at most, over the cap',
+    desc: 'As Ex 3, but week 2 is Mon 2, Tue 2, Wed 2. No single day is over 4, so today\'s code never notices; week 2 holds 6.',
+    expect: { today: '14', A: 'breaks all of week 2', B: 'brief says "breaks from Tue"; Mon\'s window already holds 3 + 2 = 5', C: 'n/a → B' },
+    steps: [
+      { label: 'Load', run: () => load([habit({ name: 'Coffee', kind: 'measurable', den: 7, targetType: 'atMost', target: 4, unit: 'coffees' }, { ...everyDay(14, 0), 6: 3, 7: 2, 8: 2, 9: 2 })], SUN_W2) },
+      { label: 'Step today back to Tue of week 2', run: () => { state.today = W1 + 8; } },
+    ],
+  },
+  {
+    title: 'Ex 4 · monthly target',
+    desc: '"At least 100 pages/month": 50 on 28 Sep, 60 on 3 Oct. Neither calendar month reaches 100; a 30-day window does from 3 Oct.',
+    expect: { today: 'none', A: 'none (or Oct pending under "hold")', B: '9 (3–11 Oct)', C: '14 (28 Sep–11 Oct)' },
+    steps: [
+      { label: 'Load', run: () => load([habit({ name: 'Read', kind: 'measurable', den: 30, target: 100, unit: 'pages' }, { 0: 50, 5: 60 })], SUN_W2) },
+      { label: 'Current month: switch to "break now"', run: () => { state.settings.currentPeriod = 'break'; } },
+    ],
+  },
+  {
+    title: 'Ex 5 · yes-or-no',
+    desc: '"3 times per week": Yes on Mon, Wed, Fri of week 1, then Sat, Sun of week 2 and Mon of week 3. Today = Sunday of week 3. Compare Yes (auto) (light squares, today\'s code) with calendar weeks.',
+    expect: { today: '7 + 7 (Sat 10–Fri 16 Oct, Mon 28 Sep–Sun 4 Oct)', A: '7 (week 1); week 3 pending under "hold"' },
+    steps: [
+      { label: 'Load', run: () => load([habit({ name: 'Exercise', kind: 'yesno', num: 3, den: 7 }, { 0: 'Y', 2: 'Y', 4: 'Y', 12: 'Y', 13: 'Y', 14: 'Y' })], W1 + 20) },
+      { label: 'Add a No on Thu of week 2 (inside a Yes (auto) stretch?)', run: () => { state.habits[0].entries[W1 + 10] = 'N'; } },
+      { label: 'Add a No on Tue of week 3 (inside one)', run: () => { state.habits[0].entries[W1 + 15] = 'N'; } },
+    ],
+  },
+  {
+    title: 'Ex 6 · reminders (#10)',
+    desc: 'Three habits, today = Sunday of week 2. Step through them and read the reminder table.',
+    expect: { note: 'No today: today\'s code fires; "entered" silences. At most 5 with 1 today: today\'s code always fires. 10/week met: "completed" (A/B/C) silences, "entered" doesn\'t.' },
+    steps: [
+      { label: 'Load', run: () => load([
+        habit({ name: 'Meditate (No today)', kind: 'yesno' }, { 12: 'Y', 13: 'N' }),
+        habit({ name: 'Coffee, at most 5/day', kind: 'measurable', den: 1, targetType: 'atMost', target: 5, unit: 'coffees' }, { 13: 1 }),
+        habit({ name: 'Run, 10 km/week, met Mon', kind: 'measurable', den: 7, target: 10, unit: 'km' }, { 7: 10 }),
+      ], SUN_W2) },
+      { label: 'Show "at most 5"', run: () => { state.selectedId = state.habits[1].id; } },
+      { label: 'Show "10 km/week"', run: () => { state.selectedId = state.habits[2].id; } },
+      { label: '"At most" completed: once entered', run: () => { state.settings.atMostCompleted = 'entered'; state.selectedId = state.habits[1].id; } },
+    ],
+  },
+];
+
+// ---------- rendering ----------
+function renderWalk() {
+  const w = WALKS[state.tab];
+  const exp = w.expect;
+  const h = sel();
+  let actual = '';
+  if (h && !exp.note) {
+    actual = Object.keys(exp).map(k => {
+      const r = PJ.judge(h, state.settings, state.today, k);
+      const st = PJ.streaks(r).map(s => s.length).join(' + ') || 'none';
+      return `<tr><td><b>${PJ.VARIANTS[k].label}</b></td><td>expected: ${exp[k]}</td><td class="muted">now: ${r.na ? 'n/a' : st}${r.note ? ' (' + r.note + ')' : ''}</td></tr>`;
+    }).join('');
+  }
+  document.getElementById('walk').innerHTML = `
+    <h2>Guided walkthroughs</h2>
+    <div class="tabs">${WALKS.map((x, i) => `<button data-act="tab" data-i="${i}" class="${i === state.tab ? 'on' : ''}">${x.title}</button>`).join('')}</div>
+    <div>${w.desc}</div>
+    <div class="steps">${w.steps.map((s, i) => `<button data-act="step" data-i="${i}" class="${i === state.step ? 'next' : ''}">${i + 1}. ${s.label}</button>`).join('')}</div>
+    <table class="expect">${exp.note ? `<tr><td>${exp.note}</td></tr>` : actual}</table>
+    <div class="flash">${state.flash}</div>`;
+}
+
+function renderSettings() {
+  const s = state.settings;
+  const seg = (key, opts) => `<span class="seg">${opts.map(([v, l]) => `<button data-act="set" data-k="${key}" data-v="${v}" class="${String(s[key]) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</span>`;
+  document.getElementById('settings').innerHTML = `<div class="controls">
+    <label>First day of the week ${seg('firstDow', [[1, 'Mon'], [0, 'Sun'], [6, 'Sat']])}</label>
+    <label>Today <span><button data-act="today" data-d="-1">◀</button>
+      <input type="date" id="todayInput" value="${PJ.iso(state.today)}">
+      <button data-act="today" data-d="1">▶</button> <span class="muted">${fmtDay(state.today)}</span></span></label>
+    <label>Unfinished period (A, decision 2) ${seg('currentPeriod', [['hold', 'holds until it ends'], ['break', 'breaks now']])}</label>
+    <label>"At most" completed today (decision 4) ${seg('atMostCompleted', [['never', 'never'], ['entered', 'once entered, under cap'], ['under', 'whenever under cap']])}</label>
+    <label>&nbsp;<span><button data-act="share">Copy habits as JSON</button> <button data-act="import">Paste JSON…</button></span></label>
+  </div>`;
+}
+
+function renderHabits() {
+  document.getElementById('habits').innerHTML = `<div class="habits">${state.habits.map(h =>
+    `<button data-act="pick" data-id="${h.id}" class="${h.id === state.selectedId ? 'on' : ''}">${h.name}<br><span class="small">${describe(h)}</span></button>`).join('')}</div>
+    <button data-act="new" data-kind="yesno">+ Yes-or-no</button> <button data-act="new" data-kind="measurable">+ Measurable</button>
+    <div style="margin-top:6px"><button data-act="delete">Delete selected</button></div>`;
+}
+function describe(h) {
+  if (!PJ.isMeasurable(h)) return h.num === 1 && h.den === 1 ? 'every day' : `${h.num} times in ${h.den} days`;
+  return `${h.targetType === 'atMost' ? 'at most' : 'at least'} ${h.target} ${h.unit}/${PJ.periodWord(h)}`;
+}
+
+function renderEditor() {
+  const h = sel();
+  const el = document.getElementById('editor');
+  if (!h) { el.innerHTML = '<h2>No habit</h2>'; return; }
+  const opt = (v, l, cur) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${l}</option>`;
+  const freqKey = `${h.num}/${h.den}`;
+  el.innerHTML = `<h2>Edit habit</h2>
+    <label>Name <input data-f="name" value="${h.name.replace(/"/g, '&quot;')}"></label>
+    <label>Kind <select data-f="kind">${opt('yesno', 'Yes-or-no', h.kind)}${opt('measurable', 'Measurable', h.kind)}</select></label><br>
+    ${PJ.isMeasurable(h) ? `
+      <label>Target type <select data-f="targetType">${opt('atLeast', 'At least', h.targetType)}${opt('atMost', 'At most', h.targetType)}</select></label>
+      <label>Target <input type="number" step="any" data-f="target" value="${h.target}"></label>
+      <label>Unit <input data-f="unit" value="${h.unit}" style="width:90px"></label>
+      <label>Target period <select data-f="den">${opt(1, 'per day', h.den)}${opt(7, 'per week', h.den)}${opt(30, 'per month', h.den)}</select></label>`
+    : `
+      <label>Frequency <select data-f="preset">${opt('1/1', 'Every day', freqKey)}${opt('1/7', '1 time per week', freqKey)}${opt('3/7', '3 times per week', freqKey)}${opt('1/30', '1 time per month', freqKey)}${['1/1', '1/7', '3/7', '1/30'].includes(freqKey) ? '' : opt(freqKey, 'custom', freqKey)}</select></label>
+      <label>N times <input type="number" min="1" data-f="num" value="${h.num}"></label>
+      <label>in M days <input type="number" min="1" data-f="den" value="${h.den}"></label>`}
+    <p class="muted small">Changes apply immediately. Entries are kept when you change the kind; yes-or-no values are ignored by a measurable habit and vice versa.</p>`;
+}
+
+function windowDays() {
+  const start = PJ.startOfWeek(state.today, state.settings.firstDow) - 35;
+  return Array.from({ length: 49 }, (_, i) => start + i);
+}
+function entryText(h, d) {
+  const e = h.entries[d];
+  if (e === undefined) return '';
+  if (e === 'Y') return '✓';
+  if (e === 'N') return '✗';
+  if (e === 'S') return '–';
+  return typeof e === 'number' ? String(e) : '';
+}
+function validEntry(h, d) {
+  const e = h.entries[d];
+  return PJ.isMeasurable(h) ? (typeof e === 'number' || e === 'S') : ['Y', 'N', 'S'].includes(e);
+}
+
+function renderGrid() {
+  const h = sel();
+  const el = document.getElementById('grid');
+  if (!h) { el.innerHTML = ''; return; }
+  const days = windowDays();
+  const names = days.slice(0, 7).map(d => fmtDay(d).split(' ')[0]);
+  el.innerHTML = `<div class="grid">${names.map(n => `<div class="hd">${n}</div>`).join('')}${days.map(d => {
+    const future = d > state.today;
+    const v = validEntry(h, d) ? entryText(h, d) : '';
+    return `<div class="${future ? 'future' : 'click'} ${d === state.today ? 'today' : ''}" ${future ? '' : `data-act="edit" data-d="${d}"`}>${PJ.ymd(d).d}${PJ.ymd(d).d === 1 ? ' ' + fmtDay(d).split(' ')[2] : ''}<div class="v">${v}</div></div>`;
+  }).join('')}</div>`;
+}
+
+function renderState() {
+  const h = sel();
+  const el = document.getElementById('state');
+  if (!h) { el.innerHTML = ''; return; }
+  const s = state.settings, today = state.today;
+  const days = windowDays();
+  const keys = PJ.variantsFor(h);
+  const results = Object.fromEntries(keys.map(k => [k, PJ.judge(h, s, today, k)]));
+  const scores = PJ.scores(h, today);
+  const isWk = d => d === PJ.startOfWeek(d, s.firstDow);
+  const cls = (d, extra = '') => `${extra} ${isWk(d) ? 'wk' : ''} ${d === today ? 'today' : ''} ${d > today ? 'future' : ''}`;
+
+  // header rows
+  let html = `<tr><th class="lbl"></th>${days.map(d => `<th class="${cls(d)}">${PJ.ymd(d).d === 1 || d === days[0] ? fmtDay(d).split(' ')[2] : ''}</th>`).join('')}</tr>`;
+  html += `<tr><th class="lbl">${h.name} <span class="muted">(${describe(h)})</span></th>${days.map(d => `<th class="${cls(d)}">${fmtDay(d)[0]}<br>${PJ.ymd(d).d}</th>`).join('')}</tr>`;
+  html += `<tr class="group"><td class="lbl"><b>Entries</b> <span class="muted small">click to edit</span></td>${days.map(d =>
+    `<td class="${cls(d, d <= today ? 'click' : '')}" ${d <= today ? `data-act="edit" data-d="${d}"` : ''}>${validEntry(h, d) ? entryText(h, d) : ''}</td>`).join('')}</tr>`;
+  for (const k of keys) {
+    const r = results[k];
+    const label = PJ.VARIANTS[k].label + (r.note ? ` <span class="muted small">(${r.note})</span>` : '');
+    if (r.na) { html += `<tr class="group"><td class="lbl"><b>${label}</b></td><td colspan="${days.length}" class="na" style="text-align:left;padding-left:8px">${r.na}</td></tr>`; continue; }
+    html += `<tr class="group"><td class="lbl"><b>${label}</b></td>${days.map(d => `<td class="${cls(d, r.days.get(d) || '')}"></td>`).join('')}</tr>`;
+    html += `<tr><td class="lbl sub">completed today, as seen that day</td>${days.map(d => {
+      if (d > today) return `<td class="${cls(d)}"></td>`;
+      const c = PJ.judge(h, s, d, k).completed;
+      return `<td class="${cls(d)}"><span class="${c ? 'yes' : 'muted'}">${c ? '●' : '○'}</span></td>`;
+    }).join('')}</tr>`;
+    if (r.periods) {
+      const byLast = new Map(r.periods.map(p => [Math.min(p.end, today), p]));
+      html += `<tr><td class="lbl sub">period total / target</td>${days.map(d => {
+        const p = byLast.get(d);
+        return `<td class="${cls(d)}" title="${p ? `${fmtDay(p.start)}–${fmtDay(p.end)}: ${p.total} / ${p.target}` : ''}">${p ? `<span class="${p.met ? 'yes' : 'no'}">${+p.total.toFixed(1)}</span>` : ''}</td>`;
+      }).join('')}</tr>`;
+    }
+  }
+  html += `<tr class="group"><td class="lbl"><b>Score</b> <span class="muted small">(app formula, %)</span></td>${days.map(d =>
+    `<td class="${cls(d)}">${d <= today && scores.has(d) ? Math.round(scores.get(d) * 100) : ''}</td>`).join('')}</tr>`;
+
+  const legend = `<div class="legend small muted">Counts toward a streak:<span class="sw entered"></span>the day's own entry
+    <span class="sw filled"></span>filled in (Yes (auto), or its period/window was met)<span class="sw skip"></span>skip
+    <span class="sw pending"></span>unfinished period, held<span class="sw"></span>doesn't count. Bold outline = today; grey = after today.
+    Period totals: <span class="yes">met</span> / <span class="no">not met</span> (hover for dates).</div>`;
+
+  // streak cards
+  const cards = keys.map(k => {
+    const r = results[k];
+    if (r.na) return `<div class="card"><h3>${PJ.VARIANTS[k].label}</h3><span class="na">${r.na}</span></div>`;
+    const st = PJ.streaks(r);
+    return `<div class="card"><h3>${PJ.VARIANTS[k].label}</h3>${st.length ? `<ol>${st.map(x =>
+      `<li>${fmtDay(x.begin)} → ${fmtDay(x.end)}: <b>${x.length} day${x.length > 1 ? 's' : ''}</b>${x.periods !== undefined && h.den !== 1 ? ` · ${x.periods} ${PJ.periodWord(h)}${x.periods > 1 ? 's' : ''}` : ''}${x.end > today ? ' <span class="muted">(runs past today, as the app counts it)</span>' : ''}</li>`).join('')}</ol>` : '<span class="muted">no streaks</span>'}</div>`;
+  }).join('');
+
+  // reminders
+  const rem = PJ.reminders(h, s, today);
+  const fire = f => (f === null ? '<span class="na">n/a</span>' : f ? '<span class="no">fires</span>' : '<span class="yes">silent</span>');
+  const remTable = `<table class="data"><tr><th>Silenced when…</th>${keys.map(k => `<th>${PJ.VARIANTS[k].label}</th>`).join('')}</tr>
+    <tr><td>(a) today's code: completed, and not an "at most" habit</td><td colspan="${keys.length}">${fire(rem.todaysCodeFires)}</td></tr>
+    <tr><td>(b) entered today</td><td colspan="${keys.length}">${fire(rem.enteredFires)}</td></tr>
+    <tr><td>(c) completed today</td>${keys.map(k => `<td>${fire(rem.perVariant[k] && rem.perVariant[k].completedFires)}</td>`).join('')}</tr>
+    <tr><td>(d) entered or completed</td>${keys.map(k => `<td>${fire(rem.perVariant[k] && rem.perVariant[k].eitherFires)}</td>`).join('')}</tr></table>`;
+
+  // completed today summary
+  const compl = `<table class="data"><tr>${keys.map(k => `<th>${PJ.VARIANTS[k].label}</th>`).join('')}</tr><tr>${keys.map(k =>
+    `<td>${results[k].na ? '<span class="na">n/a</span>' : results[k].completed ? '<span class="yes">completed</span>' : '<span class="no">not completed</span>'}</td>`).join('')}</tr></table>`;
+
+  // target progress
+  let progress = '';
+  if (PJ.isMeasurable(h)) {
+    progress = `<table class="data">${PJ.targetProgress(h, s, today).map(r =>
+      `<tr><td>${r.label}</td><td>${+r.value.toFixed(2)} / ${+r.target.toFixed(2)}${unitOf(h)}</td></tr>`).join('')}</table>
+      <p class="muted small">Port of the target progress card. Weekly targets scale to a month as ⌊days in month / 7⌋ weeks, as the app does.</p>`;
+  } else {
+    const a = results.A;
+    const cur = a.periods && a.periods[a.periods.length - 1];
+    progress = cur ? `<p>Yes (manual) this ${PJ.periodWord(h)}: <b>${cur.total} / ${cur.target}</b></p><p class="muted small">The app shows no target progress card for yes-or-no habits.</p>` : `<p class="na">${a.na || 'No entries yet.'}</p>`;
+  }
+
+  el.innerHTML = `
+    <div class="panel"><h2>Which days count, per variant</h2><div class="scroll"><table class="tl">${html}</table></div>${legend}</div>
+    <div class="panel"><h2>Streaks (newest first)</h2><div class="cards">${cards}</div></div>
+    <div class="row">
+      <div class="panel grow"><h2>Completed today (${fmtDay(today)})</h2>${compl}<h2 style="margin-top:14px">Would the reminder fire today?</h2>${remTable}</div>
+      <div class="panel grow"><h2>Period totals</h2>${progress}</div>
+    </div>`;
+}
+
+function render(full = true) {
+  renderWalk(); renderSettings(); renderHabits(); renderGrid(); renderState();
+  if (full) renderEditor();
+}
+
+// ---------- actions ----------
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const act = b.dataset.act;
+  let full = false;
+  if (act === 'tab') { state.tab = +b.dataset.i; state.step = 0; WALKS[state.tab].steps[0].run(); state.step = 1; state.flash = `Loaded ${WALKS[state.tab].title}.`; full = true; }
+  else if (act === 'step') {
+    const i = +b.dataset.i, w = WALKS[state.tab];
+    if (i === 0) nextId = 1;
+    w.steps[i].run(); state.step = Math.min(i + 1, w.steps.length - 1); state.flash = `Did: ${w.steps[i].label}.`; full = true;
+  }
+  else if (act === 'set') { const k = b.dataset.k; state.settings[k] = k === 'firstDow' ? +b.dataset.v : b.dataset.v; state.flash = `Setting changed: ${b.textContent}.`; }
+  else if (act === 'today') { state.today += +b.dataset.d; state.flash = `Today is now ${fmtDay(state.today)}.`; }
+  else if (act === 'pick') { state.selectedId = +b.dataset.id; full = true; state.flash = ''; }
+  else if (act === 'new') {
+    const h = b.dataset.kind === 'yesno' ? habit({ name: 'New yes-or-no habit' }) : habit({ name: 'New measurable habit', kind: 'measurable', den: 7, target: 10, unit: 'km' });
+    state.habits.push(h); state.selectedId = h.id; full = true; state.flash = `Added ${h.name}.`;
+  }
+  else if (act === 'delete') {
+    state.habits = state.habits.filter(h => h.id !== state.selectedId);
+    state.selectedId = state.habits.length ? state.habits[0].id : null; full = true; state.flash = 'Deleted habit.';
+  }
+  else if (act === 'edit') {
+    const h = sel(), d = +b.dataset.d;
+    if (d > state.today) return;
+    if (!PJ.isMeasurable(h)) {
+      const order = [undefined, 'Y', 'N', 'S'];
+      const cur = validEntry(h, d) ? h.entries[d] : undefined;
+      const next = order[(order.indexOf(cur) + 1) % order.length];
+      if (next === undefined) delete h.entries[d]; else h.entries[d] = next;
+      state.flash = `${fmtDay(d)}: ${next === undefined ? 'Unknown' : { Y: 'Yes (manual)', N: 'No', S: 'Skip' }[next]}.`;
+    } else {
+      const cur = validEntry(h, d) ? (h.entries[d] === 'S' ? 's' : h.entries[d]) : '';
+      const ans = prompt(`${h.name}, ${fmtDay(d)}: amount in ${h.unit || 'units'} ("s" = skip, empty = unknown)`, cur);
+      if (ans === null) return;
+      const t = ans.trim().toLowerCase();
+      if (t === '') delete h.entries[d];
+      else if (t === 's') h.entries[d] = 'S';
+      else if (!isNaN(Number(t))) h.entries[d] = Number(t);
+      else return;
+      state.flash = `${fmtDay(d)}: ${t === '' ? 'Unknown' : t === 's' ? 'Skip' : t + unitOf(h)}.`;
+    }
+  }
+  else if (act === 'share') {
+    const json = JSON.stringify({ today: PJ.iso(state.today), settings: state.settings, habits: state.habits.map(h => ({ ...h, entries: Object.fromEntries(Object.entries(h.entries).map(([d, v]) => [PJ.iso(+d), v])) })) }, null, 1);
+    (navigator.clipboard ? navigator.clipboard.writeText(json) : Promise.reject()).then(() => { state.flash = 'Copied habits and entries as JSON.'; render(false); }, () => prompt('Copy this JSON:', json));
+    return;
+  }
+  else if (act === 'import') {
+    const txt = prompt('Paste JSON from "Copy habits as JSON":');
+    if (!txt) return;
+    try {
+      const data = JSON.parse(txt);
+      state.habits = data.habits.map(h => ({ ...h, id: nextId++, entries: Object.fromEntries(Object.entries(h.entries).map(([d, v]) => [PJ.fromIso(d), v])) }));
+      state.selectedId = state.habits[0] && state.habits[0].id; state.today = PJ.fromIso(data.today); Object.assign(state.settings, data.settings);
+      state.flash = 'Loaded pasted JSON.'; full = true;
+    } catch (err) { alert('Could not read that JSON.'); return; }
+  }
+  render(full);
+});
+
+document.addEventListener('change', e => {
+  if (e.target.id === 'todayInput' && e.target.value) { state.today = PJ.fromIso(e.target.value); state.flash = `Today is now ${fmtDay(state.today)}.`; render(false); }
+});
+document.addEventListener('input', e => {
+  const f = e.target.dataset && e.target.dataset.f;
+  const h = sel();
+  if (!f || !h) return;
+  const v = e.target.value;
+  let full = false;
+  if (f === 'name' || f === 'unit') h[f] = v;
+  else if (f === 'kind') {
+    h.kind = v; full = true;
+    if (v === 'measurable') { h.num = 1; if (![1, 7, 30].includes(h.den)) h.den = 7; }
+  }
+  else if (f === 'targetType') h.targetType = v;
+  else if (f === 'preset') { const [n, m] = v.split('/').map(Number); h.num = n; h.den = m; full = true; }
+  else if (['target', 'num', 'den'].includes(f)) { const n = Number(v); if (v === '' || isNaN(n) || (f !== 'target' && n < 1)) return; h[f] = f === 'target' ? n : Math.round(n); if (f !== 'target' && !PJ.isMeasurable(h)) full = false; }
+  state.flash = `Edited habit: ${f}.`;
+  render(full);
+});
+
+WALKS[0].steps[0].run();
+state.step = 1;
+state.flash = 'Loaded Ex 1. Pick a walkthrough tab, or edit freely.';
+render();
+</script>
+</body>
+</html>

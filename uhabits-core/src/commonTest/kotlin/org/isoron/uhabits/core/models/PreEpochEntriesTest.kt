@@ -33,55 +33,62 @@ import kotlin.test.assertTrue
 class PreEpochEntriesTest : BaseUnitTest() {
     private val newYearsEve1969 = LocalDate(1969, 12, 31) // Wednesday
     private val epochDay = LocalDate(1970, 1, 1) // Thursday
+    private val december1969 = LocalDate(1969, 12, 1)
+    private val january1970 = epochDay
 
     @Test
-    fun dailyYesOrNoHabit() {
+    fun dailyYesOrNoHabitStreakSpansEpoch() {
         val habit = yesOrNoHabit(Frequency.DAILY)
         assertEquals(
             listOf(Streak(newYearsEve1969, epochDay)),
             habit.streaks.getBest(1)
         )
-        assertWeekdayFrequencyAndCompletedToday(habit, value = 1)
+        assertWeekdayCountsAroundEpoch(habit, expected = 1)
+        assertTrue(habit.isCompletedToday())
     }
 
     @Test
-    fun threeTimesPerWeekYesOrNoHabit() {
+    fun threeTimesPerWeekYesOrNoHabitStreakSpansEpoch() {
         val habit = yesOrNoHabit(Frequency.THREE_TIMES_PER_WEEK)
         assertStreakSpansBothPreEpochDays(habit)
-        assertWeekdayFrequencyAndCompletedToday(habit, value = 1)
+        assertWeekdayCountsAroundEpoch(habit, expected = 1)
+        assertTrue(habit.isCompletedToday())
     }
 
     @Test
-    fun oncePerMonthYesOrNoHabit() {
+    fun oncePerMonthYesOrNoHabitStreakSpansEpoch() {
         val habit = yesOrNoHabit(Frequency(1, 30))
         assertStreakSpansBothPreEpochDays(habit)
-        assertWeekdayFrequencyAndCompletedToday(habit, value = 1)
+        assertWeekdayCountsAroundEpoch(habit, expected = 1)
+        assertTrue(habit.isCompletedToday())
     }
 
     @Test
-    fun weeklyAtLeastMeasurableHabit() {
+    fun weeklyAtLeastMeasurableHabitStreakSpansEpoch() {
         val habit = modelFactory.buildHabit().apply {
             type = HabitType.NUMERICAL
             targetType = NumericalHabitType.AT_LEAST
             targetValue = 2.0
             frequency = Frequency.WEEKLY
         }
-        for (date in listOf(newYearsEve1969, epochDay, getToday())) {
-            habit.originalEntries.add(Entry(date, 3000))
-        }
-        habit.recompute()
+        addEntriesAroundEpochAndToday(habit, THREE_UNITS)
         assertStreakSpansBothPreEpochDays(habit)
-        assertWeekdayFrequencyAndCompletedToday(habit, value = 3000)
+        assertWeekdayCountsAroundEpoch(habit, expected = THREE_UNITS)
+        assertTrue(habit.isCompletedToday())
     }
 
     private fun yesOrNoHabit(frequency: Frequency): Habit {
         val habit = modelFactory.buildHabit()
         habit.frequency = frequency
+        addEntriesAroundEpochAndToday(habit, Entry.YES_MANUAL)
+        return habit
+    }
+
+    private fun addEntriesAroundEpochAndToday(habit: Habit, value: Int) {
         for (date in listOf(newYearsEve1969, epochDay, getToday())) {
-            habit.originalEntries.add(Entry(date, Entry.YES_MANUAL))
+            habit.originalEntries.add(Entry(date, value))
         }
         habit.recompute()
-        return habit
     }
 
     private fun assertStreakSpansBothPreEpochDays(habit: Habit) {
@@ -92,17 +99,21 @@ class PreEpochEntriesTest : BaseUnitTest() {
         )
     }
 
-    private fun assertWeekdayFrequencyAndCompletedToday(habit: Habit, value: Int) {
+    private fun assertWeekdayCountsAroundEpoch(habit: Habit, expected: Int) {
         // Index 0 is Saturday, so Wednesday is 4 and Thursday is 5.
-        val frequency = habit.originalEntries.computeWeekdayFrequency(habit.isNumerical)
+        val weekdayCountsByMonth = habit.originalEntries.computeWeekdayFrequency(habit.isNumerical)
         assertEquals(
-            listOf(0, 0, 0, 0, value, 0, 0),
-            frequency[LocalDate(1969, 12, 1)]?.toList()
+            listOf(0, 0, 0, 0, expected, 0, 0),
+            weekdayCountsByMonth[december1969]?.toList()
         )
         assertEquals(
-            listOf(0, 0, 0, 0, 0, value, 0),
-            frequency[LocalDate(1970, 1, 1)]?.toList()
+            listOf(0, 0, 0, 0, 0, expected, 0),
+            weekdayCountsByMonth[january1970]?.toList()
         )
-        assertTrue(habit.isCompletedToday())
+    }
+
+    companion object {
+        // Measurable entry values are stored multiplied by 1000.
+        private const val THREE_UNITS = 3000
     }
 }

@@ -19,11 +19,11 @@
 
 package org.isoron.platform.time
 
-import org.junit.Test
 import java.time.Month
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**

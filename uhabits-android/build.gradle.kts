@@ -97,8 +97,6 @@ android {
     }
     buildFeatures.viewBinding = true
     lint.abortOnError = false
-    // JVM unit tests run against stub android.jar; let calls like Log.e() no-op.
-    testOptions.unitTests.isReturnDefaultValues = true
 }
 
 mokkery {

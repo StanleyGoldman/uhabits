@@ -113,7 +113,8 @@ class ImportDataTaskTest : BaseAndroidJVMTest() {
             importer,
             sqlModelFactory,
             openSource,
-            { tempDir.root }
+            { tempDir.root },
+            StandardLogging()
         ) { result = it }
         task.doInBackground()
         task.onPostExecute()

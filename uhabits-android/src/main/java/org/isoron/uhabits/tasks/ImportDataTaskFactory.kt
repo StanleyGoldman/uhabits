@@ -22,6 +22,7 @@ package org.isoron.uhabits.tasks
 import android.content.Context
 import me.tatarka.inject.annotations.Inject
 import org.isoron.uhabits.core.io.GenericImporter
+import org.isoron.uhabits.core.io.Logging
 import org.isoron.uhabits.core.models.ModelFactory
 import org.isoron.uhabits.inject.AppContext
 import java.io.InputStream
@@ -30,8 +31,16 @@ import java.io.InputStream
 class ImportDataTaskFactory(
     @AppContext private val context: Context,
     private val importer: GenericImporter,
-    private val modelFactory: ModelFactory
+    private val modelFactory: ModelFactory,
+    private val logging: Logging
 ) {
     fun create(openSource: () -> InputStream?, listener: ImportDataTask.Listener) =
-        ImportDataTask(importer, modelFactory, openSource, { context.externalCacheDir }, listener)
+        ImportDataTask(
+            importer,
+            modelFactory,
+            openSource,
+            { context.externalCacheDir },
+            logging,
+            listener
+        )
 }

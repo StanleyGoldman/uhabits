@@ -1,0 +1,169 @@
+# Loop Habit Tracker
+
+Loop is an offline habit tracker: the user defines habits, records each day whether (or how much) they performed them, and the app turns that history into a score, streaks and charts.
+
+## Language
+
+### Habits
+
+**Habit**:
+Something the user wants to do regularly and tracks day by day.
+_Avoid_: Task, goal, routine
+
+**Yes-or-no habit**:
+A habit whose daily entry records only whether it was done (e.g. "Exercise").
+_Avoid_: Boolean habit, checkbox habit
+
+**Measurable habit**:
+A habit whose daily entry records an amount in a unit (e.g. "Run", in miles), judged against a target.
+_Avoid_: Numerical habit, numeric habit, quantity habit
+
+**Question**:
+The prompt a habit asks the user each day (e.g. "Did you exercise today?"), shown under its name and in reminders.
+
+**Description**:
+Free-form notes about a habit as a whole, labelled "Notes" in the edit screen.
+_Avoid_: Habit notes
+
+**Archived habit**:
+A habit the user has set aside: hidden from the main list and silenced, with its history kept so it can be unarchived.
+_Avoid_: Deleted habit, inactive habit
+
+**Position**:
+A habit's place in the user's manual ordering of the main list.
+_Avoid_: Index, rank
+
+**Habit search**:
+Narrowing the main list to habits whose name, question or description matches typed text.
+_Avoid_: Filter
+
+### Schedule and targets
+
+**Frequency**:
+How often a habit is meant to be done, expressed as "N times in M days" (e.g. every day, 3 times per week).
+_Avoid_: Schedule, repeat, interval
+
+**Target**:
+For a measurable habit, the amount the user aims for: a target type, a value and a unit.
+_Avoid_: Goal, threshold
+
+**Target type**:
+Whether a target is a minimum ("At least", e.g. 20 pages) or a maximum ("At most", e.g. 2 coffees).
+_Avoid_: Goal type
+
+**Unit**:
+The free-text label for a measurable habit's amounts (e.g. "miles", "pages").
+
+**Target period**:
+A measurable habit's frequency read as the period its target covers: per day, per week or per month.
+
+### Entries
+
+**Entry**:
+The record of one habit on one day: a value and optional entry notes.
+_Avoid_: Checkmark (except as the UI word for a yes-or-no entry), repetition, check, record
+
+**Entry notes**:
+Free text the user attaches to a single day's entry.
+_Avoid_: Description
+
+**Yes (manual)**:
+An entry where the user recorded doing a yes-or-no habit. Only these count as real completions.
+_Avoid_: Checked, done
+
+**Yes (auto)**:
+A day the app shows as done because the habit's frequency was already met by manual yeses in that window.
+_Avoid_: Implicit check, implicit checkmark, automatic checkmark
+
+**No**:
+An entry where the user recorded not doing the habit. Called a "lapse" in settings.
+_Avoid_: Fail, miss, unchecked
+
+**Skip**:
+An entry marking the day as not applicable (e.g. sick, travelling), so it neither helps nor hurts. Only available when skip days are enabled.
+_Avoid_: Excused day, rest day, freeze
+
+**Unknown**:
+A day with nothing recorded, shown as "?" when question marks are enabled and otherwise like a no.
+_Avoid_: Empty, missing entry, question mark
+
+**Amount**:
+The number recorded for a measurable habit on one day, in the habit's unit.
+_Avoid_: Numerical value, count
+
+**Toggle**:
+Cycling a yes-or-no entry through its values with one gesture on the main list or a widget.
+
+**Completed (today)**:
+A habit whose today's entry is a yes, a skip, or meets an "at least" target. Used by "Hide completed".
+_Avoid_: Done, checked
+
+**Entered (today)**:
+A habit whose today's entry is anything other than unknown. Used by "Hide entered".
+
+### Progress
+
+**Score**:
+A 0–100% measure of how established a habit is, weighted toward recent days, so one missed day after a long run only dents it.
+_Avoid_: Habit strength, progress, percentage
+
+**Streak**:
+A run of consecutive days on which the habit counted as done.
+_Avoid_: Chain, run
+
+**Today**:
+The day the app treats as current, which can be set to start at 3:00 AM instead of midnight.
+_Avoid_: Current date
+
+**First day of the week**:
+The user's chosen start of the week, used to lay out the calendar and group days into weeks.
+
+### Habit screen views
+
+**Overview**:
+A yes-or-no habit's summary card: its current score, how that changed over the past month and year, and its total manual yeses.
+
+**Calendar**:
+The grid of a habit's daily entries on its screen. The widget showing the same grid is named "History".
+_Avoid_: History, heatmap
+
+**Bar chart**:
+A habit's totals per period, from day to year: manual yeses for a yes-or-no habit, amounts for a measurable one. Its card is titled "History".
+_Avoid_: Repetitions chart, History
+
+**Frequency chart**:
+How often a habit was done on each weekday, month by month; not the habit's frequency setting.
+
+**Target progress**:
+A measurable habit's amount so far in the current day, week, month, quarter and year, each against the target scaled to that period.
+
+### Reminders
+
+**Reminder**:
+A notification for a habit at a chosen time on chosen days, asking its question. It stays quiet once the habit is completed for the day.
+_Avoid_: Alarm, notification
+
+**Snooze**:
+Postponing a shown reminder ("Later") by a chosen delay.
+
+### Data in and out
+
+**Full backup**:
+A file holding all habits and entries that the app can import again. The app also makes automatic backups.
+_Avoid_: Database export, db file
+
+**CSV export**:
+A zip of spreadsheet files of habits, entries and scores for use elsewhere; it cannot be imported back.
+
+**Import**:
+Loading habits and entries from a full backup or from another habit app's export (Tickmate, HabitBull, Rewire).
+
+### Widgets and automation
+
+**Widget**:
+A home-screen view of one habit, in one of several kinds: checkmark, history, score, streaks, frequency or target.
+_Avoid_: Home-screen shortcut
+
+**Automation action**:
+An action another app (Tasker, Locale and compatible tools) performs on a habit for today: check, uncheck or toggle a yes-or-no habit, or increment or decrement a measurable one.
+_Avoid_: Plugin command

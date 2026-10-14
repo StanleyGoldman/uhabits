@@ -30,7 +30,6 @@ import nl.dionsegijn.konfetti.core.Party
 import nl.dionsegijn.konfetti.core.Position
 import nl.dionsegijn.konfetti.core.emitter.Emitter
 import org.isoron.platform.gui.toInt
-import org.isoron.platform.io.JavaUserFile
 import org.isoron.uhabits.R
 import org.isoron.uhabits.activities.common.dialogs.CheckmarkDialog
 import org.isoron.uhabits.activities.common.dialogs.ColorPickerDialogFactory
@@ -71,15 +70,13 @@ import org.isoron.uhabits.tasks.ExportDBTaskFactory
 import org.isoron.uhabits.tasks.ImportDataTask
 import org.isoron.uhabits.tasks.ImportDataTaskFactory
 import org.isoron.uhabits.utils.ColorUtils
-import org.isoron.uhabits.utils.copyTo
 import org.isoron.uhabits.utils.currentTheme
 import org.isoron.uhabits.utils.dismissCurrentAndShow
 import org.isoron.uhabits.utils.restartWithFade
 import org.isoron.uhabits.utils.showMessage
 import org.isoron.uhabits.utils.showSendEmailScreen
 import org.isoron.uhabits.utils.showSendFileScreen
-import java.io.File
-import java.io.IOException
+import java.io.InputStream
 import java.util.concurrent.TimeUnit
 
 const val RESULT_IMPORT_DATA = 101
@@ -133,18 +130,9 @@ class ListHabitsScreen(
     }
 
     private fun onOpenDocumentResult(resultCode: Int, data: Intent?) {
-        if (data == null) return
         if (resultCode != Activity.RESULT_OK) return
-        try {
-            val inStream = activity.contentResolver.openInputStream(data.data!!)!!
-            val cacheDir = activity.externalCacheDir
-            val tempFile = File.createTempFile("import", "", cacheDir)
-            inStream.copyTo(tempFile)
-            onImportData(JavaUserFile(tempFile.toPath())) { tempFile.delete() }
-        } catch (e: IOException) {
-            activity.showMessage(activity.resources.getString(R.string.could_not_import))
-            e.printStackTrace()
-        }
+        val uri = data?.data ?: return
+        onImportData { activity.contentResolver.openInputStream(uri) }
     }
 
     private fun onSettingsResult(resultCode: Int) {
@@ -344,9 +332,9 @@ class ListHabitsScreen(
         }
     }
 
-    private fun onImportData(file: org.isoron.platform.io.UserFile, onFinished: () -> Unit) {
+    private fun onImportData(openSource: () -> InputStream?) {
         taskRunner.execute(
-            importTaskFactory.create(file) { result ->
+            importTaskFactory.create(openSource) { result ->
                 when (result) {
                     ImportDataTask.SUCCESS -> {
                         adapter.refresh()
@@ -361,7 +349,6 @@ class ListHabitsScreen(
                         activity.showMessage(activity.resources.getString(R.string.could_not_import))
                     }
                 }
-                onFinished()
             }
         )
     }

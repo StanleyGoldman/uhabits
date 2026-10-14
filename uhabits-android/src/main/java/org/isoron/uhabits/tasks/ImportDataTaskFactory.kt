@@ -19,16 +19,19 @@
 
 package org.isoron.uhabits.tasks
 
+import android.content.Context
 import me.tatarka.inject.annotations.Inject
-import org.isoron.platform.io.UserFile
 import org.isoron.uhabits.core.io.GenericImporter
 import org.isoron.uhabits.core.models.ModelFactory
+import org.isoron.uhabits.inject.AppContext
+import java.io.InputStream
 
 @Inject
 class ImportDataTaskFactory(
+    @AppContext private val context: Context,
     private val importer: GenericImporter,
     private val modelFactory: ModelFactory
 ) {
-    fun create(file: UserFile, listener: ImportDataTask.Listener) =
-        ImportDataTask(importer, modelFactory, file, listener)
+    fun create(openSource: () -> InputStream?, listener: ImportDataTask.Listener) =
+        ImportDataTask(importer, modelFactory, openSource, { context.externalCacheDir }, listener)
 }

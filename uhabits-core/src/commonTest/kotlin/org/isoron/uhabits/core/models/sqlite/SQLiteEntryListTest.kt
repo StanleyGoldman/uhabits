@@ -76,6 +76,18 @@ class SQLiteEntryListTest {
     }
 
     @Test
+    fun testLoadEntryAtUnixEpoch() = runTest {
+        initTest()
+        factory.entryRepository.insert(
+            EntryData(habitId = entries.habitId, timestamp = 0, value = 2)
+        )
+        assertEquals(
+            listOf(Entry(date = LocalDate(1970, 1, 1), value = 2)),
+            entries.getKnown()
+        )
+    }
+
+    @Test
     fun testAdd() = runTest {
         initTest()
         val habitId = entries.habitId!!

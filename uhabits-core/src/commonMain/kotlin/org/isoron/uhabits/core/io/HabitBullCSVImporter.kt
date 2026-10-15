@@ -52,41 +52,51 @@ class HabitBullCSVImporter(
     }
 
     override suspend fun importHabitsFromFile(file: UserFile) {
-        val lines = file.lines()
+        val rows = file.lines()
+            .map { parseCsvLine(it) }
+            .filter { it.size >= 6 && it[0] != "HabitName" }
+            .map { cols -> Row(cols[0], cols[1], parseDate(cols[3]), parseInt(cols[4]), cols[5]) }
+
+        // First pass: any value above 1 makes the habit measurable, so the
+        // type is known before any of its entries are written.
+        val numericalNames = rows.filter { it.value > 1 }.map { it.name }.toSet()
+
         val map = HashMap<String, Habit>()
-        for (line in lines) {
-            val cols = parseCsvLine(line)
-            if (cols.size < 6) continue
-            val name = cols[0]
-            if (name == "HabitName") continue
-            val description = cols[1]
-            val date = parseDate(cols[3])
-            var h = map[name]
+        for (row in rows) {
+            var h = map[row.name]
             if (h == null) {
                 h = modelFactory.buildHabit()
-                h.name = name
-                h.description = description
+                h.name = row.name
+                h.description = row.description
                 h.frequency = Frequency.DAILY
-                habitList.add(h)
-                map[name] = h
-                logger.info("Creating habit: $name")
-            }
-            val notes = cols[5]
-            when (val value = parseInt(cols[4])) {
-                0 -> h.originalEntries.add(Entry(date, Entry.NO, notes))
-                1 -> h.originalEntries.add(Entry(date, Entry.YES_MANUAL, notes))
-                else -> {
-                    if (value > 1 && h.type != HabitType.NUMERICAL) {
-                        logger.info("Found a value of $value, considering this habit as numerical.")
-                        h.type = HabitType.NUMERICAL
-                    }
-                    h.originalEntries.add(Entry(date, value * 1000, notes))
+                if (row.name in numericalNames) {
+                    logger.info("Found a value above 1, considering this habit as numerical.")
+                    h.type = HabitType.NUMERICAL
                 }
+                habitList.add(h)
+                map[row.name] = h
+                logger.info("Creating habit: ${row.name}")
             }
+            val entry = if (h.isNumerical) {
+                Entry(row.date, Entry.AMOUNT, row.value * 1000, row.notes)
+            } else if (row.value == 1) {
+                Entry(row.date, Entry.YES_MANUAL, null, row.notes)
+            } else {
+                Entry(row.date, Entry.NO, null, row.notes)
+            }
+            h.originalEntries.add(entry)
         }
 
         map.forEach { (_, habit) -> habit.recompute() }
     }
+
+    private class Row(
+        val name: String,
+        val description: String,
+        val date: LocalDate,
+        val value: Int,
+        val notes: String
+    )
 
     private fun parseDate(rawValue: String): LocalDate {
         if (rawValue.contains("-")) {

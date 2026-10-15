@@ -21,3 +21,13 @@ actual fun createTestDateFormatter(): LocalDateFormatter {
 }
 
 actual suspend fun ensureFontsLoaded() {}
+
+actual suspend fun <T> withDefaultLocale(languageTag: String, block: suspend () -> T): T {
+    val previous = Locale.getDefault()
+    Locale.setDefault(Locale.forLanguageTag(languageTag))
+    try {
+        return block()
+    } finally {
+        Locale.setDefault(previous)
+    }
+}

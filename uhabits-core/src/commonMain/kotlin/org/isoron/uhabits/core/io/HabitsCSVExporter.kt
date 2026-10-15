@@ -23,9 +23,10 @@ import org.isoron.platform.io.csvLine
 import org.isoron.platform.io.format
 import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.getToday
-import org.isoron.uhabits.core.models.EntryList
+import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitList
+import kotlin.math.abs
 import kotlin.math.min
 
 /**
@@ -43,7 +44,7 @@ class HabitsCSVExporter(
         for (h in selectedHabits) {
             val habitDirName = habitDirName(h)
             zip.addEntry("${habitDirName}Scores.csv", writeScores(h))
-            zip.addEntry("${habitDirName}Checkmarks.csv", writeEntries(h.computedEntries))
+            zip.addEntry("${habitDirName}Checkmarks.csv", writeEntries(h))
         }
         zip.addEntry("Scores.csv", writeMultipleHabitsScores())
         zip.addEntry("Checkmarks.csv", writeMultipleHabitsCheckmarks())
@@ -73,11 +74,11 @@ class HabitsCSVExporter(
         return sb.toString()
     }
 
-    private fun writeEntries(entries: EntryList): String {
+    private fun writeEntries(habit: Habit): String {
         val sb = StringBuilder()
         sb.append(csvLine(arrayOf("Date", "Value", "Notes")))
-        for (entry in entries.getKnown()) {
-            sb.append(csvLine(arrayOf(entry.date.toCSVString(), entry.formattedValue, entry.notes)))
+        for (entry in habit.computedEntries.getKnown()) {
+            sb.append(csvLine(arrayOf(entry.date.toCSVString(), csvValue(entry, habit), entry.notes)))
         }
         return sb.toString()
     }
@@ -114,11 +115,38 @@ class HabitsCSVExporter(
             val date = newest.minus(i).toCSVString()
             sb.append(date).append(delimiter)
             for (j in selectedHabits.indices) {
-                sb.append(checkmarks[j][i].formattedValue).append(delimiter)
+                sb.append(csvValue(checkmarks[j][i], selectedHabits[j])).append(delimiter)
             }
             sb.append("\n")
         }
         return sb.toString()
+    }
+
+    /**
+     * The entry's amount as a plain decimal (`2.5`, `5000`) when it has one,
+     * otherwise its state's label.
+     */
+    private fun csvValue(entry: Entry, habit: Habit): String {
+        val e = entry.toStateForm(habit.isNumerical)
+        return e.amount?.let { formatAmount(it) } ?: when (e.state) {
+            Entry.YES_MANUAL -> "YES_MANUAL"
+            Entry.YES_AUTO -> "YES_AUTO"
+            Entry.NO -> "NO"
+            Entry.SKIP -> "SKIP"
+            Entry.UNKNOWN -> "UNKNOWN"
+            else -> e.state.toString()
+        }
+    }
+
+    /**
+     * Formats an amount stored ×1000 as a plain decimal with no trailing
+     * zeros. Integer arithmetic keeps the separator `.` in every locale.
+     */
+    private fun formatAmount(amount: Int): String {
+        val sign = if (amount < 0) "-" else ""
+        val whole = abs(amount / 1000)
+        val fraction = abs(amount % 1000).toString().padStart(3, '0').trimEnd('0')
+        return if (fraction.isEmpty()) "$sign$whole" else "$sign$whole.$fraction"
     }
 
     private fun writeMultipleHabitsHeader(sb: StringBuilder) {

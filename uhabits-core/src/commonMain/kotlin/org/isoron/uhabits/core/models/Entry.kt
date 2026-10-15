@@ -61,16 +61,6 @@ data class Entry(
         }
     }
 
-    val formattedValue: String
-        get() = when (value) {
-            YES_MANUAL -> "YES_MANUAL"
-            YES_AUTO -> "YES_AUTO"
-            NO -> "NO"
-            SKIP -> "SKIP"
-            UNKNOWN -> "UNKNOWN"
-            else -> value.toString()
-        }
-
     companion object {
         /**
          * State of a measurable entry that records an amount.

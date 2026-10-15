@@ -110,6 +110,12 @@ class HabitCardView(
             numberPanel.values = values.map { it / 1000.0 }.toDoubleArray()
         }
 
+    var states
+        get() = numberPanel.states
+        set(states) {
+            numberPanel.states = states
+        }
+
     var threshold: Double
         get() = numberPanel.threshold
         set(value) {

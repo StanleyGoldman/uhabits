@@ -27,6 +27,7 @@ import org.isoron.uhabits.HabitsApplication
 import org.isoron.uhabits.R
 import org.isoron.uhabits.activities.common.views.RingView
 import org.isoron.uhabits.activities.habits.list.views.toShortString
+import org.isoron.uhabits.core.models.Entry.Companion.AMOUNT
 import org.isoron.uhabits.core.models.Entry.Companion.NO
 import org.isoron.uhabits.core.models.Entry.Companion.SKIP
 import org.isoron.uhabits.core.models.Entry.Companion.UNKNOWN
@@ -37,7 +38,6 @@ import org.isoron.uhabits.inject.HabitsApplicationComponent
 import org.isoron.uhabits.utils.InterfaceUtils.getDimension
 import org.isoron.uhabits.utils.PaletteUtils.getAndroidTestColor
 import org.isoron.uhabits.utils.StyledResources
-import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -48,8 +48,13 @@ class CheckmarkWidgetView : HabitWidgetView {
     var name: String? = null
     private lateinit var ring: RingView
     private lateinit var label: TextView
-    var entryValue = 0
     var entryState = 0
+
+    /** State of today's measurable entry: [AMOUNT], [SKIP] or [UNKNOWN]. */
+    var amountState = UNKNOWN
+
+    /** Today's amount ×1000, shown when [amountState] is [AMOUNT]. */
+    var amount = 0
     var isNumerical = false
     private var preferences: Preferences? = null
 
@@ -106,7 +111,15 @@ class CheckmarkWidgetView : HabitWidgetView {
 
     private val text: String
         get() = if (isNumerical) {
-            (max(0, entryValue) / 1000.0).toShortString()
+            when (amountState) {
+                AMOUNT -> (amount / 1000.0).toShortString()
+                SKIP -> resources.getString(R.string.fa_skipped)
+                else -> if (preferences!!.areQuestionMarksEnabled) {
+                    resources.getString(R.string.fa_question)
+                } else {
+                    "0"
+                }
+            }
         } else {
             when (entryState) {
                 YES_MANUAL, YES_AUTO -> resources.getString(R.string.fa_check)
@@ -162,7 +175,7 @@ class CheckmarkWidgetView : HabitWidgetView {
             percentage = 0.75f
             name = "Wake up early"
             activeColor = getAndroidTestColor(6)
-            entryValue = YES_MANUAL
+            entryState = YES_MANUAL
             refresh()
         }
     }

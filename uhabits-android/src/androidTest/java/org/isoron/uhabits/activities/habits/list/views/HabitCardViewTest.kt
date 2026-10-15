@@ -83,11 +83,13 @@ class HabitCardViewTest : BaseViewTest() {
         val entries = habit2
             .computedEntries
             .getByInterval(today.minus(300), today)
-            .map { it.value }.toIntArray()
+        val entryStates = entries
+            .map { it.toStateForm(isNumerical = true).state }.toIntArray()
 
         view.apply {
             habit = habit2
-            values = entries
+            values = entries.map { it.value }.toIntArray()
+            states = entryStates
         }
         assertRenders(view, "$PATH/render_numerical.png")
     }

@@ -23,6 +23,7 @@ import org.isoron.platform.Synchronized
 import org.isoron.platform.time.DayOfWeek
 import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.TruncateField
+import org.isoron.uhabits.core.models.Entry.Companion.AMOUNT
 import org.isoron.uhabits.core.models.Entry.Companion.SKIP
 import org.isoron.uhabits.core.models.Entry.Companion.UNKNOWN
 import org.isoron.uhabits.core.models.Entry.Companion.YES_AUTO
@@ -120,6 +121,8 @@ open class EntryList {
      * successful checkmarks during the specified month that occurred on a Saturday. The
      * second entry corresponds to Sunday, and so on. If there are no
      * successful checkmarks during a certain month, the value is null.
+     * For a numerical habit, the values are the summed amounts ×1000; skipped
+     * and unknown days add nothing.
      *
      * @return total number of checkmarks by month versus day of week
      */
@@ -127,7 +130,8 @@ open class EntryList {
     fun computeWeekdayFrequency(isNumerical: Boolean): HashMap<LocalDate, Array<Int>> {
         val entries = getKnown()
         val map = hashMapOf<LocalDate, Array<Int>>()
-        for (entry in entries) {
+        for (original in entries) {
+            val entry = original.toStateForm(isNumerical)
             val weekday = (entry.date.dayOfWeek.daysSinceSunday + 1) % 7
             val monthStart = entry.date.startOfMonth()
 
@@ -138,8 +142,8 @@ open class EntryList {
             }
 
             if (isNumerical) {
-                list[weekday] += entry.value
-            } else if (entry.value == YES_MANUAL) {
+                if (entry.state == AMOUNT) list[weekday] += entry.amount!!
+            } else if (entry.state == YES_MANUAL) {
                 list[weekday] += 1
             }
         }

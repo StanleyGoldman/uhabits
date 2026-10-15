@@ -27,18 +27,22 @@ data class CreateRepetitionCommand(
     val habitList: HabitList,
     val habit: Habit,
     val date: LocalDate,
-    val value: Int,
-    val notes: String,
-    /** The amount ×1000 when [value] is the state [Entry.AMOUNT]; null for the old single-value form. */
-    val amount: Int? = null
+    val state: Int,
+    /** The amount ×1000, non-null only when [state] is [Entry.AMOUNT]. */
+    val amount: Int?,
+    val notes: String
 ) : Command {
+    /** The old form: [value] is an old-form entry value, as [Entry]'s secondary constructor takes it. */
+    constructor(habitList: HabitList, habit: Habit, date: LocalDate, value: Int, notes: String) :
+        this(habitList, habit, date, value, null, notes)
+
     /** Records [entry], in state and amount form, on its date. */
     constructor(habitList: HabitList, habit: Habit, entry: Entry) :
-        this(habitList, habit, entry.date, entry.state, entry.notes, entry.amount)
+        this(habitList, habit, entry.date, entry.state, entry.amount, entry.notes)
 
     override fun run() {
         val entries = habit.originalEntries
-        entries.add(Entry(date, value, amount, notes))
+        entries.add(Entry(date, state, amount, notes))
         habit.recompute()
         habitList.resort()
     }

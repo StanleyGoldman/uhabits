@@ -34,6 +34,7 @@ import org.isoron.uhabits.core.models.NumericalHabitType.AT_LEAST
 import org.isoron.uhabits.core.models.NumericalHabitType.AT_MOST
 import org.isoron.uhabits.core.models.PaletteColor
 import org.isoron.uhabits.core.preferences.Preferences
+import org.isoron.uhabits.core.ui.NumberField
 import org.isoron.uhabits.core.ui.callbacks.CheckMarkDialogCallback
 import org.isoron.uhabits.core.ui.callbacks.NumberPickerCallback
 import org.isoron.uhabits.core.ui.views.HistoryChart
@@ -44,7 +45,6 @@ import org.isoron.uhabits.core.ui.views.HistoryChart.Square.OFF
 import org.isoron.uhabits.core.ui.views.HistoryChart.Square.ON
 import org.isoron.uhabits.core.ui.views.OnDateClickedListener
 import org.isoron.uhabits.core.ui.views.Theme
-import kotlin.math.roundToInt
 
 data class HistoryCardState(
     val color: PaletteColor,
@@ -129,19 +129,19 @@ class HistoryCardPresenter(
 
     private fun showNumberPopup(date: LocalDate) {
         val entry = habit.computedEntries.get(date)
-        val oldValue = entry.value
         screen.showNumberPopup(
-            value = oldValue / 1000.0,
+            field = NumberField.of(entry),
             notes = entry.notes
-        ) { newValue: Double, newNotes: String ->
-            val thousands = (newValue * 1000).roundToInt()
+        ) { input, newNotes ->
+            val newEntry = input.toEntry(entry, newNotes)
             commandRunner.run(
                 CreateRepetitionCommand(
                     habitList,
                     habit,
                     date,
-                    thousands,
-                    newNotes
+                    newEntry.state,
+                    newEntry.notes,
+                    newEntry.amount
                 )
             )
         }
@@ -203,7 +203,7 @@ class HistoryCardPresenter(
         fun showHistoryEditorDialog(listener: OnDateClickedListener)
         fun showFeedback()
         fun showNumberPopup(
-            value: Double,
+            field: NumberField,
             notes: String,
             callback: NumberPickerCallback
         )

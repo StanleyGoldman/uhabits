@@ -18,9 +18,11 @@
  */
 package org.isoron.uhabits.core.ui.callbacks
 
+import org.isoron.uhabits.core.ui.NumberInput
+
 fun interface NumberPickerCallback {
     fun onNumberPicked(
-        newValue: Double,
+        input: NumberInput,
         notes: String
     )
     fun onNumberPickerDismissed() {}

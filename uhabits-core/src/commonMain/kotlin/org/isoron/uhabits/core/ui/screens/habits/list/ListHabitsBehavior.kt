@@ -35,9 +35,9 @@ import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.tasks.ExportCSVTask
 import org.isoron.uhabits.core.tasks.Task
 import org.isoron.uhabits.core.tasks.TaskRunner
+import org.isoron.uhabits.core.ui.NumberField
 import org.isoron.uhabits.core.ui.callbacks.CheckMarkDialogCallback
 import org.isoron.uhabits.core.ui.callbacks.NumberPickerCallback
-import kotlin.math.roundToInt
 
 @Inject
 open class ListHabitsBehavior(
@@ -60,10 +60,11 @@ open class ListHabitsBehavior(
         val onDismiss = { habit.id?.let { cache.endGracePeriod(it) } ?: Unit }
         val entry = habit.computedEntries.get(date)
         if (habit.type == HabitType.NUMERICAL) {
-            val oldValue = entry.value.toDouble() / 1000
-            screen.showNumberPopup(oldValue, entry.notes, onDismiss) { newValue: Double, newNotes: String ->
-                val value = (newValue * 1000).roundToInt()
-                if (newValue != oldValue) {
+            screen.showNumberPopup(NumberField.of(entry), entry.notes, onDismiss) { input, newNotes ->
+                val newEntry = input.toEntry(entry, newNotes)
+                val newAmount = newEntry.amount
+                if (newAmount != null && newAmount != entry.amount) {
+                    val newValue = newAmount / 1000.0
                     if (
                         (habit.targetType == AT_LEAST && newValue >= habit.targetValue) ||
                         (habit.targetType == AT_MOST && newValue <= habit.targetValue)
@@ -71,7 +72,9 @@ open class ListHabitsBehavior(
                         screen.showConfetti(habit.color, x, y)
                     }
                 }
-                commandRunner.run(CreateRepetitionCommand(habitList, habit, date, value, newNotes))
+                commandRunner.run(
+                    CreateRepetitionCommand(habitList, habit, date, newEntry.state, newEntry.notes, newEntry.amount)
+                )
             }
         } else {
             screen.showCheckmarkPopup(
@@ -169,7 +172,7 @@ open class ListHabitsBehavior(
         fun showIntroScreen()
         fun showMessage(m: Message)
         fun showNumberPopup(
-            value: Double,
+            field: NumberField,
             notes: String,
             onDismiss: () -> Unit,
             callback: NumberPickerCallback

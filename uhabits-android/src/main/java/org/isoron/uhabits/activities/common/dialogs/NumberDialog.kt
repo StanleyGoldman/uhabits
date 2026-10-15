@@ -13,25 +13,22 @@ import android.view.inputmethod.EditorInfo
 import androidx.appcompat.app.AppCompatDialogFragment
 import org.isoron.uhabits.HabitsApplication
 import org.isoron.uhabits.R
-import org.isoron.uhabits.core.models.Entry
+import org.isoron.uhabits.core.ui.NumberInput
 import org.isoron.uhabits.databinding.CheckmarkPopupBinding
 import org.isoron.uhabits.utils.InterfaceUtils
-import org.isoron.uhabits.utils.getCenter
 import org.isoron.uhabits.utils.requestFocusWithKeyboard
 import org.isoron.uhabits.utils.sres
-import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
-import java.text.NumberFormat
-import java.text.ParseException
 
 class NumberDialog : AppCompatDialogFragment() {
 
-    var onToggle: (Double, String) -> Unit = { _, _ -> }
+    var onToggle: (NumberInput, String) -> Unit = { _, _ -> }
     var onDismiss: () -> Unit = {}
 
     private var dismissedViaSaveAction = false
     private var originalNotes: String = ""
-    private var originalValue: Double = 0.0
+    private var originalText: String = ""
+    private val separator = DecimalFormatSymbols.getInstance().decimalSeparator
     private lateinit var view: CheckmarkPopupBinding
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -52,14 +49,10 @@ class NumberDialog : AppCompatDialogFragment() {
         view.numberButtons.visibility = View.VISIBLE
         fixDecimalSeparator(view)
         originalNotes = requireArguments().getString("notes")!!
-        originalValue = requireArguments().getDouble("value")
+        originalText = requireArguments().getString("text")!!.replace('.', separator)
         view.notes.setText(originalNotes)
-        view.value.setText(
-            when {
-                originalValue < 0.01 -> "0"
-                else -> DecimalFormat("#.##").format(originalValue)
-            }
-        )
+        view.value.setText(originalText)
+        if (requireArguments().getBoolean("skipped")) view.value.setHint(R.string.skipped)
         view.value.setOnKeyListener { _, keyCode, event ->
             if (event.action == MotionEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_ENTER) {
                 save()
@@ -71,13 +64,11 @@ class NumberDialog : AppCompatDialogFragment() {
             save()
         }
         view.skipBtnNumber.setOnClickListener {
-            view.value.setText(DecimalFormat("#.###").format((Entry.SKIP.toDouble() / 1000)))
-            save()
+            save(NumberInput.Skip)
         }
 
         view.unknownBtnNumber.setOnClickListener {
-            view.value.setText(DecimalFormat("#.###").format((Entry.UNKNOWN.toDouble() / 1000)))
-            save()
+            save(NumberInput.Unknown)
         }
 
         view.notes.setOnEditorActionListener { v, actionId, event ->
@@ -99,7 +90,7 @@ class NumberDialog : AppCompatDialogFragment() {
         if (!dismissedViaSaveAction) {
             val currentNotes = view.notes.text.toString().trim()
             if (currentNotes != originalNotes) {
-                onToggle(originalValue, currentNotes)
+                onToggle(typed(originalText), currentNotes)
             }
         }
         onDismiss()
@@ -107,7 +98,6 @@ class NumberDialog : AppCompatDialogFragment() {
 
     private fun fixDecimalSeparator(view: CheckmarkPopupBinding) {
         // https://stackoverflow.com/a/34256139
-        val separator = DecimalFormatSymbols.getInstance().decimalSeparator
         view.value.keyListener = DigitsKeyListener.getInstance("0123456789$separator")
 
         // https://github.com/flutter/flutter/issues/61175
@@ -120,23 +110,12 @@ class NumberDialog : AppCompatDialogFragment() {
         }
     }
 
-    fun save() {
+    fun save(input: NumberInput = typed(view.value.text.toString())) {
         dismissedViaSaveAction = true
-        var value = originalValue
-        try {
-            val numberFormat = NumberFormat.getInstance()
-            val valueStr = view.value.text.toString()
-            value = if (valueStr.isNotEmpty()) {
-                numberFormat.parse(valueStr)!!.toDouble()
-            } else {
-                Entry.UNKNOWN.toDouble() / 1000
-            }
-        } catch (e: ParseException) {
-            // NOP
-        }
         val notes = view.notes.text.toString().trim()
-        val location = view.saveBtn.getCenter()
-        onToggle(value, notes)
+        onToggle(input, notes)
         requireDialog().dismiss()
     }
+
+    private fun typed(text: String) = NumberInput.Typed(text.replace(separator, '.'))
 }

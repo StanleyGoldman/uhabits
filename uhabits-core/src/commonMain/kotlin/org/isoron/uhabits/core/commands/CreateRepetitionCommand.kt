@@ -28,11 +28,13 @@ data class CreateRepetitionCommand(
     val habit: Habit,
     val date: LocalDate,
     val value: Int,
-    val notes: String
+    val notes: String,
+    /** The amount ×1000 when [value] is the state [Entry.AMOUNT]; null for the old single-value form. */
+    val amount: Int? = null
 ) : Command {
     override fun run() {
         val entries = habit.originalEntries
-        entries.add(Entry(date, value, notes))
+        entries.add(Entry(date, value, amount, notes))
         habit.recompute()
         habitList.resort()
     }

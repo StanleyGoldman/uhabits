@@ -1,0 +1,458 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Never merge. Answers #51:
+  "How do the calendar and the streak card show period judging for weekly/monthly measurable habits?"
+
+  Plan: three variants of the habit screen's History card (and the History widget, which shares its
+  presenter), switchable via ?variant=A|B|C and the floating bar at the bottom; plus toggles for the
+  streak card's "· N weeks/months" label placement and for drawing held (open) days in the streak bar.
+
+  Assumption: the app is Android, so instead of mounting variants on the real screen this file redraws
+  HistoryChart (core/ui/views/HistoryChart.kt) and StreakChart (android/.../StreakChart.kt) in SVG with
+  their geometry, square kinds (ON, OFF, GREY, DIMMED, HATCHED) and label rules. Judging follows the
+  map's decisions: calendar periods by default, rolling as an option (#31); unfinished periods hold;
+  a skip drops out of its period and scales the target down (#41); "assume none" on (#4, #46).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Period Calendar Prototype</title>
+<style>
+  :root { --page:#eceff1; --card:#fff; --text:#212121; --muted:#757575; --line:#e0e0e0; }
+  body.dark { --page:#121212; --card:#262626; --text:#f5f5f5; --muted:#9e9e9e; --line:#424242; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--page); color:var(--text); padding-bottom:90px; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); background:var(--card); }
+  h1 { font-size:16px; margin:0 0 8px; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0; }
+  .row b { font-weight:600; color:var(--muted); font-size:12px; min-width:90px; }
+  button.chip { border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:14px; padding:4px 10px; cursor:pointer; font:inherit; font-size:13px; }
+  button.chip.on { background:#1e88e5; border-color:#1e88e5; color:#fff; }
+  main { display:flex; flex-wrap:wrap; gap:16px; padding:16px; align-items:flex-start; }
+  .phone { width:400px; max-width:100%; display:flex; flex-direction:column; gap:12px; }
+  .card { background:var(--card); border-radius:4px; box-shadow:0 1px 3px rgba(0,0,0,.2); padding:12px; }
+  .card h2 { font-size:14px; margin:0 0 8px; color:#1e88e5; font-weight:600; }
+  .wall { border-radius:8px; padding:16px; background:linear-gradient(135deg,#5c6bc0,#26a69a); }
+  .wall .lbl { color:#fff; font-size:12px; text-align:center; margin-top:4px; text-shadow:0 1px 2px rgba(0,0,0,.6); }
+  .side { flex:1; min-width:300px; max-width:620px; display:flex; flex-direction:column; gap:12px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  td, th { text-align:left; padding:3px 6px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; }
+  .st-met { color:#2e7d32; font-weight:600; } .st-open { color:#1e88e5; font-weight:600; } .st-missed { color:#c62828; font-weight:600; }
+  body.dark .st-met { color:#81c784; } body.dark .st-missed { color:#ef9a9a; } body.dark .st-open { color:#64b5f6; }
+  .note { color:var(--muted); font-size:13px; }
+  .legend { display:flex; flex-wrap:wrap; gap:8px 14px; }
+  .legend div { display:flex; gap:6px; align-items:center; font-size:12px; }
+  #switcher { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#111; color:#fff; border-radius:24px;
+    padding:6px 8px; display:flex; gap:8px; align-items:center; box-shadow:0 4px 14px rgba(0,0,0,.45); font-size:13px; z-index:9; }
+  #switcher button { background:#333; color:#fff; border:0; border-radius:50%; width:32px; height:32px; cursor:pointer; font-size:16px; }
+  #switcher span { min-width:240px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PROTOTYPE · how the calendar and streak card draw period judging (#51) · throwaway</h1>
+  <div class="row"><b>Scenario</b><span id="scenarios"></span></div>
+  <div class="row"><b>Streak label</b><span id="labels"></span></div>
+  <div class="row"><b>Held days</b><span id="tails"></span></div>
+  <div class="row"><b>Theme</b><span id="themes"></span></div>
+</header>
+<main>
+  <div class="phone">
+    <div class="card"><h2>History</h2><div id="history"></div></div>
+    <div class="card"><h2>Best streaks</h2><div id="streaks"></div></div>
+    <div class="wall"><div id="widget" style="display:flex;justify-content:center"></div><div class="lbl">History widget (transparent, on wallpaper)</div></div>
+  </div>
+  <div class="side">
+    <div class="card"><h2 id="vtitle"></h2><div id="vdesc" class="note"></div><div class="legend" id="legend" style="margin-top:8px"></div></div>
+    <div class="card"><h2 id="stitle"></h2><div id="sdesc" class="note"></div></div>
+    <div class="card"><h2>State: how each period was judged</h2><div id="state"></div></div>
+  </div>
+</main>
+<div id="switcher"><button id="prev" title="Previous (←)">◀</button><span id="vlabel"></span><button id="next" title="Next (→)">▶</button></div>
+
+<script>
+// ---------- dates (day numbers, UTC) ----------
+const DAY = 86400000;
+const dn = (y, m, d) => Date.UTC(y, m - 1, d) / DAY;
+const parts = n => { const t = new Date(n * DAY); return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate(), dow: t.getUTCDay() }; };
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const WD = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const wk = n => (parts(n).dow + 6) % 7;            // first day of the week = Monday
+const weekStart = n => n - wk(n);
+const longFmt = n => { const p = parts(n); return `${MON[p.m - 1]} ${p.d}, ${p.y}`; };
+const shortFmt = n => { const p = parts(n); return `${WD[wk(n)]} ${MON[p.m - 1]} ${p.d}`; };
+const TODAY = dn(2026, 10, 15); // a Thursday
+
+// ---------- scenarios ----------
+function E(list) { const m = new Map(); for (const [y, mo, d, v] of list) m.set(dn(y, mo, d), v); return m; }
+const S1_ENTRIES = [
+  [2026,8,10,5],[2026,8,13,6],                       // met 11
+  [2026,8,18,3],[2026,8,21,4],                       // missed 7
+  [2026,8,29,10],                                    // met
+  [2026,8,31,4],[2026,9,2,'skip'],[2026,9,4,5],      // 9 vs 10×6/7 = 8.6 → met only because the skip dropped out
+  ...[7,8,9,10,11,12,13].map(d => [2026,9,d,2]),     // met 14
+  [2026,9,20,12],                                    // met
+  [2026,9,21,6],[2026,9,22,5],                       // met early (Tue)
+  [2026,9,30,4],                                     // missed
+  [2026,10,6,5],[2026,10,10,6],                      // met
+  [2026,10,12,3],[2026,10,13,2],                     // open: 5 / 10 so far
+];
+const S2_ENTRIES = [
+  [2026,8,16,3],
+  [2026,8,17,2],[2026,8,18,2],[2026,8,19,2],         // over the cap on Wed
+  [2026,8,27,1],
+  [2026,8,31,1],[2026,9,1,'skip'],[2026,9,4,3],      // 4 vs 4×6/7 = 3.4 → over: the skip shrank the cap
+  [2026,9,7,2],
+  [2026,9,23,2],[2026,9,24,2],
+  [2026,10,3,1],
+  [2026,10,9,3],
+];
+const SCENARIOS = {
+  week: { title: 'At least 10 km per week (calendar)', kind: 'least', target: 10, unit: 'km', period: 'week', mode: 'calendar', cols: 10,
+    e: E(S1_ENTRIES),
+    desc: 'Covers met, missed, met-early, a met week that holds only because its skip dropped out (week of Aug 31), and the open current week at 5 / 10.' },
+  most: { title: 'At most 4 coffees per week (calendar), under the cap', kind: 'most', target: 4, unit: 'coffees', period: 'week', mode: 'calendar', cols: 10,
+    e: E([...S2_ENTRIES, [2026,10,12,1],[2026,10,13,1]]),
+    desc: '"Assume none" is on, so empty days are 0. Week of Aug 17 goes over the cap on Wed; week of Aug 31 goes over on Fri because the skip shrank the cap to 3.4. The current week is open at 2 / 4.' },
+  mostOver: { title: 'At most 4 coffees per week (calendar), over the cap this week', kind: 'most', target: 4, unit: 'coffees', period: 'week', mode: 'calendar', cols: 10,
+    e: E([...S2_ENTRIES, [2026,10,12,2],[2026,10,13,2],[2026,10,14,1]]),
+    desc: 'Same history, but this week passed the cap yesterday (Wed): the period is missed before it ends, and today sits in a missed week.' },
+  month: { title: 'At least 100 pages per month (calendar)', kind: 'least', target: 100, unit: 'pages', period: 'month', mode: 'calendar', cols: 15,
+    e: E([[2026,7,8,30],[2026,7,20,40],[2026,7,29,35],
+          [2026,8,28,50],
+          [2026,9,3,20],[2026,9,10,30],[2026,9,14,'skip'],[2026,9,17,25],[2026,9,24,30],
+          [2026,10,2,25],[2026,10,9,30]]),
+    desc: 'Month periods cut across the week columns. July met, August missed, September met (one skip), October open at 55 / 100.' },
+  rolling: { title: 'At least 10 km per 7 days (rolling)', kind: 'least', target: 10, unit: 'km', period: 'week', mode: 'rolling', cols: 10,
+    e: E(S1_ENTRIES),
+    desc: 'Same entries as the first scenario, judged by the 7 days ending on each day. There are no periods to draw, so the streak label is not shown (decision on #31: calendar mode only).' },
+};
+
+// ---------- judging ----------
+function periodBounds(n, period) {
+  if (period === 'week') { const s = weekStart(n); return [s, s + 6]; }
+  const p = parts(n); return [dn(p.y, p.m, 1), dn(p.y, p.m + 1, 1) - 1];
+}
+function judge(sc) {
+  // history starts at the oldest entry (like computedEntries.getKnown), widened to its period in calendar mode
+  const oldest = Math.min(...sc.e.keys());
+  const from = sc.mode === 'calendar' ? periodBounds(oldest, sc.period)[0] : oldest;
+  const days = new Map(), periods = [];
+  const amt = n => sc.e.get(n);
+  if (sc.mode === 'calendar') {
+    let n = periodBounds(from, sc.period)[0];
+    while (n <= TODAY) {
+      const [s, e] = periodBounds(n, sc.period);
+      const len = e - s + 1;
+      let counting = 0; for (let d = s; d <= e; d++) if (amt(d) !== 'skip') counting++;
+      const eff = sc.target * counting / len;
+      let total = 0, overDay = null, metDay = null;
+      for (let d = s; d <= Math.min(e, TODAY); d++) {
+        const v = amt(d); if (typeof v !== 'number') continue;
+        total += v;
+        if (sc.kind === 'most' && overDay === null && total > eff + 1e-9) overDay = d;
+        if (sc.kind === 'least' && metDay === null && total >= eff - 1e-9) metDay = d;
+      }
+      const closed = e < TODAY;
+      const status = sc.kind === 'least' ? (metDay !== null ? 'met' : closed ? 'missed' : 'open')
+                                         : (overDay !== null ? 'missed' : closed ? 'met' : 'open');
+      const p = { s, e, len, counting, eff, total, status, overDay, metDay, progress: total / eff };
+      periods.push(p);
+      for (let d = s; d <= Math.min(e, TODAY); d++) days.set(d, { n: d, v: amt(d), status, progress: p.progress, overcap: d === overDay, period: p });
+      n = e + 1;
+    }
+  } else {
+    const M = sc.period === 'week' ? 7 : 30;
+    for (let d = from; d <= TODAY; d++) {
+      let counting = 0, total = 0;
+      for (let k = d - M + 1; k <= d; k++) { const v = amt(k); if (v === 'skip') continue; counting++; if (typeof v === 'number') total += v; }
+      const eff = sc.target * counting / M;
+      let status;
+      if (sc.kind === 'least') status = total >= eff - 1e-9 ? 'met' : d === TODAY ? 'open' : 'missed';
+      else status = total > eff + 1e-9 ? 'missed' : d === TODAY ? 'open' : 'met';
+      days.set(d, { n: d, v: amt(d), status, progress: total / eff, overcap: false, window: { total, eff, counting } });
+    }
+  }
+  // streaks: runs of met or open (held) days
+  const streaks = []; let cur = null;
+  for (let d = from; d <= TODAY; d++) {
+    const i = days.get(d); const ok = i && (i.status === 'met' || i.status === 'open');
+    if (ok) {
+      if (!cur) cur = { start: d, end: d, held: 0, metPeriods: new Set() };
+      cur.end = d; if (i.status === 'open') cur.held++;
+      if (i.period && i.status === 'met') cur.metPeriods.add(i.period.s);
+    } else if (cur) { streaks.push(cur); cur = null; }
+  }
+  if (cur) streaks.push(cur);
+  for (const s of streaks) { s.length = s.end - s.start + 1; s.periods = sc.mode === 'calendar' ? s.metPeriods.size : null; }
+  return { days, periods, streaks };
+}
+
+// ---------- colours ----------
+const THEMES = {
+  light: { card: '#ffffff', low: '#e0e0e0', medium: '#9e9e9e', high: '#212121', mtext: '#757575', color: '#1e88e5' },
+  dark:  { card: '#262626', low: '#424242', medium: '#757575', high: '#f5f5f5', mtext: '#9e9e9e', color: '#42a5f5' },
+};
+const RED = '#e53935';
+function hex(c) { return [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)); }
+function blend(a, b, t) { const x = hex(a), y = hex(b); return '#' + x.map((v, i) => Math.round(v * (1 - t) + y[i] * t).toString(16).padStart(2, '0')).join(''); }
+function lum(c) { const [r, g, b] = hex(c); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
+
+// ---------- square styles per variant ----------
+// Returns { fill, hatch, outline, level, levelColor, marker }
+function squareStyle(variant, sc, info, th, bg) {
+  const C = th.color, dim = blend(C, bg, 0.5), entered = typeof info.v === 'number';
+  const skip = info.v === 'skip';
+  const base = () => {
+    if (skip) return { fill: info.status === 'missed' ? blend(th.medium, bg, 0.5) : dim, hatch: true };
+    if (info.status === 'met') return { fill: entered ? C : dim };
+    if (info.status === 'missed') return { fill: entered ? th.medium : th.low, marker: info.overcap };
+    return null; // open: variant decides
+  };
+  if (variant === 'A' || (variant === 'B' && sc.mode === 'rolling')) {
+    const b = base(); if (b) return b;
+    return { fill: entered ? dim : th.low, outline: C };
+  }
+  if (variant === 'B') {
+    if (skip) return { fill: dim, hatch: true };
+    return { fill: entered ? C : th.low, marker: info.overcap };
+  }
+  // C: progress fill
+  if (sc.mode === 'rolling' && info.status !== 'met' && !skip)
+    return { fill: th.low, level: Math.min(1, info.progress), levelColor: info.status === 'open' ? C : blend(th.medium, bg, 0.3) };
+  const b = base(); if (b) return b;
+  const lv = Math.min(1, info.progress);
+  return { fill: th.low, level: lv, levelColor: sc.kind === 'most' ? dim : C, bold: entered };
+}
+
+// ---------- HistoryChart in SVG ----------
+let clipId = 0;
+function historySvg(variant, sc, J, opts) {
+  const th = THEMES[opts.theme]; const bg = opts.transparent ? '#000000' : th.card;
+  const cols = opts.cols, s = opts.square, spacing = Math.max(1, s * 0.06), pad = 0;
+  const fs = Math.min(14, s * 0.42);
+  const wdW = opts.noWeekdays ? 0 : fs * 2.4;
+  const bars = variant === 'B' && sc.mode === 'calendar';
+  const barH = bars ? Math.round(s * 0.36) : 0;
+  const W = cols * s + wdW, H = 8 * s + (bars ? barH + spacing * 2 : 0);
+  const textOn = opts.transparent ? '#ffffff' : null;
+  const topLeft = weekStart(TODAY) - (cols - 1) * 7;
+  let out = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="system-ui,sans-serif">`;
+  if (!opts.transparent) out += `<rect width="${W}" height="${H}" fill="${th.card}"/>`;
+  let lastMonth = '', lastYear = '';
+  for (let c = 0; c < cols; c++) {
+    const top = topLeft + 7 * c, p = parts(top);
+    let head = '';
+    if (MON[p.m - 1] !== lastMonth) { head = lastMonth = MON[p.m - 1]; } else if (String(p.y) !== lastYear) { head = lastYear = String(p.y); }
+    if (head) out += `<text x="${c * s}" y="${s * 0.62}" font-size="${fs}" fill="${textOn || th.mtext}">${head}</text>`;
+    for (let r = 0; r < 7; r++) {
+      const d = top + r; if (d > TODAY) continue;
+      const info = J.days.get(d) || { n: d, v: undefined, status: 'missed', progress: 0 };
+      const st = squareStyle(variant, sc, info, th, opts.transparent ? '#000000' : th.card);
+      const x = pad + c * s, y = pad + (r + 1) * s, w = s - spacing, rx = w * 0.15;
+      const tip = `${shortFmt(d)}: ${info.v === undefined ? 'unknown' : info.v === 'skip' ? 'skip' : info.v + ' ' + sc.unit} · ${info.status}${info.overcap ? ' · went over the cap' : ''}`;
+      out += `<g><title>${tip}</title><rect x="${x}" y="${y}" width="${w}" height="${w}" rx="${rx}" fill="${st.fill}"/>`;
+      if (st.level) {
+        const id = 'cl' + (clipId++);
+        out += `<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${w}" rx="${rx}"/></clipPath>`;
+        out += `<rect clip-path="url(#${id})" x="${x}" y="${y + w * (1 - st.level)}" width="${w}" height="${w * st.level}" fill="${st.levelColor}"/>`;
+      }
+      if (st.hatch) {
+        let k = w / 10; const sw = Math.max(0.75, w * 0.03);
+        for (let i = 0; i < 5; i++) {
+          out += `<line x1="${x + k}" y1="${y}" x2="${x}" y2="${y + k}" stroke="${opts.transparent ? '#000' : th.card}" stroke-width="${sw}"/>`;
+          out += `<line x1="${x + w - k}" y1="${y + w}" x2="${x + w}" y2="${y + w - k}" stroke="${opts.transparent ? '#000' : th.card}" stroke-width="${sw}"/>`;
+          k += w / 5;
+        }
+      }
+      if (st.outline) { const sw = Math.max(1.5, w * 0.08); out += `<rect x="${x + sw / 2}" y="${y + sw / 2}" width="${w - sw}" height="${w - sw}" rx="${rx}" fill="none" stroke="${st.outline}" stroke-width="${sw}" stroke-dasharray="${opts.dashed ? w * 0.18 : 'none'}"/>`; }
+      if (st.marker) out += `<path d="M${x} ${y + rx}Q${x} ${y} ${x + rx} ${y}L${x + w * 0.42} ${y}L${x} ${y + w * 0.42}Z" fill="${RED}"/>`;
+      // text colour like the app: pick whichever of card background / medium text contrasts more
+      const fillForText = st.level && st.level > 0.5 ? st.levelColor : st.fill;
+      const tc = textOn || (Math.abs(lum(fillForText) - lum(th.card)) > Math.abs(lum(fillForText) - lum(th.mtext)) ? th.card : th.mtext);
+      out += `<text x="${x + w / 2}" y="${y + w / 2 + fs * 0.35}" font-size="${fs}" text-anchor="middle" fill="${tc}" font-weight="${st.bold ? 700 : 400}">${parts(d).d}</text></g>`;
+    }
+    if (bars) out += periodBar(sc, J, top, c * s, 8 * s + spacing, s - spacing, barH, th, opts);
+  }
+  if (!opts.noWeekdays) for (let r = 0; r < 7; r++) out += `<text x="${cols * s + s * 0.15}" y="${(r + 1) * s + s / 2 + fs * 0.35}" font-size="${fs}" fill="${textOn || th.mtext}">${WD[r]}</text>`;
+  return out + '</svg>';
+}
+// Variant B: one bar per column, split by period (months can split a column)
+function periodBar(sc, J, top, x, y, w, h, th, opts) {
+  let out = '', segs = [];
+  for (let r = 0; r < 7; r++) {
+    const d = top + r, info = J.days.get(d); if (!info || d > TODAY) continue;
+    const last = segs[segs.length - 1];
+    if (last && last.p === info.period) last.n++; else segs.push({ p: info.period, n: 1, r });
+  }
+  const unit = w / 7, gap = 1.5, C = th.color, bg = opts.transparent ? '#000000' : th.card;
+  for (const g of segs) {
+    const sx = x + g.r * unit + (g.r ? gap : 0), sw = g.n * unit - (g.r ? gap : 0);
+    const tip = `${sc.period === 'week' ? 'Week of ' + shortFmt(g.p.s) : MON[parts(g.p.s).m - 1]}: ${+g.p.total.toFixed(1)} / ${+g.p.eff.toFixed(1)} ${sc.unit} · ${g.p.status}`;
+    out += `<g><title>${tip}</title>`;
+    if (g.p.status === 'met') out += `<rect x="${sx}" y="${y}" width="${sw}" height="${h}" rx="${h / 2}" fill="${C}"/>`;
+    else if (g.p.status === 'missed') out += `<rect x="${sx}" y="${y}" width="${sw}" height="${h}" rx="${h / 2}" fill="${g.p.overDay ? RED : th.low}" opacity="${g.p.overDay ? 0.55 : 1}"/>`;
+    else {
+      const lv = Math.min(1, g.p.progress), id = 'cl' + (clipId++);
+      out += `<clipPath id="${id}"><rect x="${sx}" y="${y}" width="${sw}" height="${h}" rx="${h / 2}"/></clipPath>`;
+      out += `<rect x="${sx}" y="${y}" width="${sw}" height="${h}" rx="${h / 2}" fill="${th.low}"/>`;
+      // the bar's fill shows the whole period's progress, so a split month shows its share
+      out += `<rect clip-path="url(#${id})" x="${sx}" y="${y}" width="${sw * lv}" height="${h}" fill="${blend(C, bg, 0.35)}"/>`;
+      out += `<rect x="${sx + 0.75}" y="${y + 0.75}" width="${sw - 1.5}" height="${h - 1.5}" rx="${h / 2}" fill="none" stroke="${C}" stroke-width="1.5"/>`;
+    }
+    out += '</g>';
+  }
+  return out;
+}
+
+// ---------- StreakChart in SVG ----------
+const measureCtx = document.createElement('canvas').getContext('2d');
+function streakSvg(sc, J, opts) {
+  const th = THEMES[opts.theme];
+  const W = 376, base = 28, fs = 13, em = fs * 1.2, margin = 0.5 * em;
+  measureCtx.font = `${fs}px system-ui, sans-serif`;
+  const mw = t => measureCtx.measureText(t).width;
+  const unit = sc.period === 'week' ? 'week' : 'month';
+  const lbl = s => s.periods == null ? '' : `${s.periods} ${unit}${s.periods === 1 ? '' : 's'}`;
+  // best 6 by length, shown newest first (like StreakList.getBest)
+  const best = [...J.streaks].sort((a, b) => b.length - a.length).slice(0, 6).sort((a, b) => b.end - a.end);
+  if (!best.length) return '<div class="note">No streaks.</div>';
+  const maxLen = Math.max(...best.map(s => s.length));
+  const endLabel = s => longFmt(s.end) + (opts.label === 'L2' && lbl(s) ? ' · ' + lbl(s) : '');
+  let maxLabelW = 0;
+  for (const s of best) maxLabelW = Math.max(maxLabelW, mw(longFmt(s.start)), mw(endLabel(s)));
+  let showLabels = true;
+  if (W - 2 * maxLabelW < W * 0.25) { maxLabelW = 0; showLabels = false; } // StreakChart.updateMaxMinLengths
+  const rowH = opts.label === 'L3' ? base * 1.55 : base;
+  const C = th.color, [r, g, b] = hex(C);
+  let out = `<svg width="${W}" height="${rowH * best.length}" font-family="system-ui,sans-serif" font-size="${fs}">`;
+  best.forEach((s, i) => {
+    const pct = s.length / maxLen;
+    let avail = W - 2 * maxLabelW; if (showLabels) avail -= 2 * margin;
+    const text = s.length + (opts.label === 'L1' && lbl(s) ? ' · ' + lbl(s) : '');
+    const barW = Math.max(pct * avail, mw(text) + em);
+    const gap = (W - barW) / 2, y0 = i * rowH, pad = base * 0.05, h = base - 2 * pad;
+    const color = pct >= 1 ? C : pct >= 0.8 ? `rgba(${r},${g},${b},.75)` : pct >= 0.5 ? `rgba(${r},${g},${b},.38)` : th.low;
+    const tcol = pct >= 0.5 ? th.card : th.mtext;
+    const tip = `${longFmt(s.start)} – ${longFmt(s.end)}: ${s.length} days${s.held ? `, the last ${s.held} held by the open period` : ''}${lbl(s) ? ` · ${lbl(s)} met` : ''}`;
+    out += `<g><title>${tip}</title>`;
+    if (opts.tail === 'outlined' && s.held) {
+      const heldW = barW * s.held / s.length, solidW = barW - heldW;
+      out += `<rect x="${gap}" y="${y0 + pad}" width="${solidW}" height="${h}" rx="2" fill="${color}"/>`;
+      out += `<rect x="${gap + solidW + 0.75}" y="${y0 + pad + 0.75}" width="${heldW - 1.5}" height="${h - 1.5}" rx="2" fill="none" stroke="${C}" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+    } else out += `<rect x="${gap}" y="${y0 + pad}" width="${barW}" height="${h}" rx="2" fill="${color}"/>`;
+    const ty = y0 + base / 2 + 0.3 * em;
+    out += `<text x="${W / 2}" y="${ty}" text-anchor="middle" fill="${opts.tail === 'outlined' && s.held && s.held / s.length > 0.5 ? th.mtext : tcol}">${text}</text>`;
+    if (showLabels) {
+      out += `<text x="${gap - margin}" y="${ty}" text-anchor="end" fill="${th.mtext}">${longFmt(s.start)}</text>`;
+      out += `<text x="${W - gap + margin}" y="${ty}" fill="${th.mtext}">${endLabel(s)}</text>`;
+    }
+    if (opts.label === 'L3' && lbl(s)) out += `<text x="${W / 2}" y="${y0 + base + fs * 0.75}" text-anchor="middle" font-size="${fs * 0.85}" fill="${th.mtext}">${lbl(s)}</text>`;
+    out += '</g>';
+  });
+  return out + '</svg>' + (showLabels ? '' : '<div class="note">Date labels hidden: they would leave the bars under 25% of the width (the app\'s own rule).</div>');
+}
+
+// ---------- variants & copy ----------
+const VARIANTS = {
+  A: { name: 'Day colours', desc: 'Every day carries its period\'s verdict, using the squares the app already has. Met period: days you entered are full colour, the rest dimmed (the Yes (auto) look). Missed period: grey for entered days, empty otherwise. Open period: an outline in the habit colour marks the days being held. A red corner marks the day an "at most" period went over the cap. Rolling mode uses the same squares, judged per day.' },
+  B: { name: 'Period bars', desc: 'Squares show only what you entered (colour), skipped (hatched) or left empty. A bar under each week column carries the verdict: solid = met, empty = missed, red = went over the cap, outlined and part-filled = open, filled to the period\'s progress. Month periods split a column\'s bar where the month changes. Rolling mode has no periods, so it falls back to A.' },
+  C: { name: 'Progress fill', desc: 'Closed periods look like A. Days of the open period fill from the bottom to the period\'s progress so far (5 / 10 → half full), all to the same level; bold numbers are days you entered. "At most" fills to the share of the cap used. In rolling mode every day short of its window fills to that window\'s progress, so you can see how close each day came.' },
+};
+const LABELS = {
+  L1: 'In the bar: "28 · 4 weeks"',
+  L2: 'After the end date: "Sep 27, 2026 · 4 weeks"',
+  L3: 'Second line under the bar',
+};
+const TAILS = { plain: 'Plain bar', outlined: 'Held days outlined' };
+
+// ---------- state & render ----------
+const q = new URLSearchParams(location.search);
+const state = {
+  variant: q.get('variant') in VARIANTS ? q.get('variant') : 'A',
+  scenario: q.get('scenario') in SCENARIOS ? q.get('scenario') : 'week',
+  label: q.get('label') in LABELS ? q.get('label') : 'L1',
+  tail: q.get('tail') in TAILS ? q.get('tail') : 'plain',
+  theme: q.get('theme') === 'dark' ? 'dark' : 'light',
+};
+function chips(el, obj, key, label = v => v) {
+  document.getElementById(el).innerHTML = Object.keys(obj).map(k =>
+    `<button class="chip ${state[key] === k ? 'on' : ''}" data-k="${key}" data-v="${k}">${label(obj[k], k)}</button>`).join(' ');
+}
+function render() {
+  document.body.classList.toggle('dark', state.theme === 'dark');
+  const sc = SCENARIOS[state.scenario], J = judge(sc), V = VARIANTS[state.variant];
+  chips('scenarios', SCENARIOS, 'scenario', s => s.title);
+  chips('labels', LABELS, 'label', (t, k) => `${k}: ${t}`);
+  chips('tails', TAILS, 'tail');
+  chips('themes', { light: 'Light', dark: 'Dark' }, 'theme');
+  clipId = 0;
+  const sq = Math.floor(330 / (sc.cols + 1.2));
+  document.getElementById('history').innerHTML = historySvg(state.variant, sc, J, { cols: sc.cols, square: sq, theme: state.theme });
+  document.getElementById('widget').innerHTML = historySvg(state.variant, sc, J, { cols: 6, square: 22, theme: state.theme, transparent: true });
+  document.getElementById('streaks').innerHTML = streakSvg(sc, J, { theme: state.theme, label: state.label, tail: state.tail });
+  document.getElementById('vtitle').textContent = `Variant ${state.variant}: ${V.name}`;
+  document.getElementById('vdesc').textContent = V.desc;
+  document.getElementById('legend').innerHTML = legend(state.variant, sc);
+  document.getElementById('stitle').textContent = sc.title;
+  document.getElementById('sdesc').textContent = sc.desc + ' Today is Thu Oct 15, 2026; weeks start on Monday. Hover a square, bar or streak for detail.';
+  document.getElementById('state').innerHTML = stateTable(sc, J);
+  document.getElementById('vlabel').textContent = `${state.variant} (${V.name})`;
+  const p = new URLSearchParams(state); history.replaceState(null, '', '?' + p);
+}
+function legend(variant, sc) {
+  const th = THEMES[state.theme];
+  const items = [
+    ['met, entered', { v: 5, status: 'met', progress: 1.2 }],
+    ['met, not entered', { v: undefined, status: 'met', progress: 1.2 }],
+    ['open, entered', { v: 3, status: 'open', progress: 0.5 }],
+    ['open, not entered', { v: undefined, status: 'open', progress: 0.5 }],
+    ['missed, entered', { v: 3, status: 'missed', progress: 0.7 }],
+    ['missed, not entered', { v: undefined, status: 'missed', progress: 0.7 }],
+    ['skip (drops out)', { v: 'skip', status: 'met', progress: 1 }],
+    ['went over the cap', { v: 2, status: 'missed', progress: 1.5, overcap: true }],
+  ];
+  return items.map(([t, info]) => {
+    const one = { ...sc, cols: 1 };
+    const fakeJ = { days: new Map() };
+    // draw a single square for TODAY with this info
+    const wsq = weekStart(TODAY);
+    for (let r = 0; r < 7; r++) fakeJ.days.set(wsq + r, { ...info, n: wsq + r, period: { s: wsq, e: wsq + 6, total: 0, eff: 1, progress: info.progress, status: info.status } });
+    const svg = historySvg(variant === 'B' ? 'B' : variant, { ...one, mode: 'calendar' }, fakeJ, { cols: 1, square: 24, theme: state.theme, noWeekdays: true });
+    // crop to the Monday square only
+    return `<div><span style="display:inline-block;width:23px;height:23px;overflow:hidden;position:relative"><span style="position:absolute;top:-24px;left:0">${svg}</span></span>${t}</div>`;
+  }).join('') + (variant === 'B' && sc.mode === 'calendar' ? '<div class="note" style="width:100%">The bar under each column is the period verdict; the squares above only show entries.</div>' : '');
+}
+function stateTable(sc, J) {
+  const fmt = x => +x.toFixed(1);
+  if (sc.mode === 'calendar') {
+    const first = weekStart(TODAY) - (sc.cols - 1) * 7;
+    const rows = J.periods.filter(p => p.e >= first).map(p => {
+      const name = sc.period === 'week' ? `Week of ${shortFmt(p.s)}` : `${MON[parts(p.s).m - 1]} ${parts(p.s).y}`;
+      const days = p.counting === p.len ? `${p.len}` : `${p.counting} of ${p.len} (skip)`;
+      const when = p.overDay ? `over on ${shortFmt(p.overDay)}` : p.metDay && p.status === 'met' ? `met on ${shortFmt(p.metDay)}` : '';
+      return `<tr><td>${name}</td><td>${days}</td><td>${fmt(p.total)} / ${fmt(p.eff)} ${sc.unit}</td><td class="st-${p.status}">${p.status}</td><td>${when}</td></tr>`;
+    }).reverse().join('');
+    return `<table><tr><th>Period</th><th>Days that count</th><th>Total / target</th><th>Status</th><th></th></tr>${rows}</table>`;
+  }
+  const rows = [];
+  for (let d = TODAY; d > TODAY - 21; d--) { const i = J.days.get(d); rows.push(`<tr><td>${shortFmt(d)}</td><td>${i.v === undefined ? '' : i.v}</td><td>${fmt(i.window.total)} / ${fmt(i.window.eff)} ${sc.unit}</td><td class="st-${i.status}">${i.status}</td></tr>`); }
+  return `<table><tr><th>Day</th><th>Entry</th><th>7 days ending here</th><th>Status</th></tr>${rows.join('')}</table>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('button.chip'); if (!b) return;
+  state[b.dataset.k] = b.dataset.v; render();
+});
+const keys = Object.keys(VARIANTS);
+function cycle(dir) { state.variant = keys[(keys.indexOf(state.variant) + dir + keys.length) % keys.length]; render(); }
+document.getElementById('prev').onclick = () => cycle(-1);
+document.getElementById('next').onclick = () => cycle(1);
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,[contenteditable]')) return;
+  if (e.key === 'ArrowLeft') cycle(-1); if (e.key === 'ArrowRight') cycle(1);
+});
+render();
+</script>
+</body>
+</html>

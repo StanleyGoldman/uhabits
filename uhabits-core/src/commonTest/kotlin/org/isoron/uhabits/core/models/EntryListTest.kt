@@ -385,11 +385,11 @@ class EntryListTest {
     }
 
     @Test
-    fun testWeekdayFrequency_numericalSumsOnlyAmounts() {
+    fun testWeekdayFrequency_measurableSumsOnlyAmounts() {
         val entries = EntryList()
         entries.add(Entry(LocalDate(2015, 1, 5), AMOUNT, 5000)) // Monday
         entries.add(Entry(LocalDate(2015, 1, 12), SKIP, null)) // Monday
-        entries.add(Entry(LocalDate(2015, 1, 19), UNKNOWN, null, "rest day")) // Monday
+        entries.add(Entry(LocalDate(2015, 1, 19), UNKNOWN, null, "note")) // Monday
         entries.add(Entry(LocalDate(2015, 1, 6), SKIP, null)) // Tuesday
         entries.add(Entry(LocalDate(2015, 1, 7), AMOUNT, 0)) // Wednesday
 

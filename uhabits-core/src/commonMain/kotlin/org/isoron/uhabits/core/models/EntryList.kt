@@ -130,8 +130,8 @@ open class EntryList {
     fun computeWeekdayFrequency(isNumerical: Boolean): HashMap<LocalDate, Array<Int>> {
         val entries = getKnown()
         val map = hashMapOf<LocalDate, Array<Int>>()
-        for (stored in entries) {
-            val entry = stored.toStateForm(isNumerical)
+        for (original in entries) {
+            val entry = original.toStateForm(isNumerical)
             val weekday = (entry.date.dayOfWeek.daysSinceSunday + 1) % 7
             val monthStart = entry.date.startOfMonth()
 

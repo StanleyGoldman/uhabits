@@ -110,7 +110,7 @@ class HabitCardListCacheTest : BaseUnitTest() {
         val h = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_MOST)
         h.originalEntries.add(Entry(today, Entry.AMOUNT, 3))
         h.originalEntries.add(Entry(today.minus(1), Entry.SKIP, null))
-        h.originalEntries.add(Entry(today.minus(2), Entry.UNKNOWN, null, "rest day"))
+        h.originalEntries.add(Entry(today.minus(2), Entry.UNKNOWN, null, "note"))
         h.recompute()
         habitList.add(h)
         cache.refreshAllHabits()
@@ -121,6 +121,18 @@ class HabitCardListCacheTest : BaseUnitTest() {
             intArrayOf(Entry.AMOUNT, Entry.SKIP, Entry.UNKNOWN),
             states.sliceArray(0..2)
         )
+    }
+
+    @Test
+    fun testGetCheckmarks_measurableOldFormYesReadsAsAmountOfOne() {
+        val h = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
+        h.originalEntries.add(Entry(today, Entry.YES_MANUAL))
+        h.recompute()
+        habitList.add(h)
+        cache.refreshAllHabits()
+
+        assertEquals(1000, cache.getCheckmarks(h.id!!)[0])
+        assertEquals(Entry.AMOUNT, cache.getStates(h.id!!)[0])
     }
 
     @Test

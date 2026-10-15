@@ -18,6 +18,13 @@
  */
 package org.isoron.uhabits.core.ui.screens.habits.list
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import me.tatarka.inject.annotations.Inject
 import org.isoron.platform.Synchronized
 import org.isoron.platform.time.getToday
@@ -32,6 +39,7 @@ import org.isoron.uhabits.core.models.HabitList.Order
 import org.isoron.uhabits.core.models.HabitMatcher
 import org.isoron.uhabits.core.tasks.Task
 import org.isoron.uhabits.core.tasks.TaskRunner
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * A HabitCardListCache fetches and keeps a cache of all the data necessary to
@@ -45,6 +53,11 @@ import org.isoron.uhabits.core.tasks.TaskRunner
  *
  * Note that this class is singleton-scoped, therefore it is shared among all
  * activities.
+ *
+ *
+ * A habit toggled on the list gets a grace period: its row stays visible for
+ * [GRACE_PERIOD] after the last toggle, even if the filter would hide it, so
+ * that the user can keep tapping through values.
  */
 @AppScope
 @Inject
@@ -52,7 +65,8 @@ class HabitCardListCache(
     private val allHabits: HabitList,
     private val commandRunner: CommandRunner,
     taskRunner: TaskRunner,
-    logging: Logging
+    logging: Logging,
+    graceDispatcher: CoroutineDispatcher = Dispatchers.Main
 ) : CommandRunner.Listener {
 
     private val logger = logging.getLogger("HabitCardListCache")
@@ -62,6 +76,9 @@ class HabitCardListCache(
     private var listener: Listener
     private val data: CacheData
     private var filteredHabits: HabitList
+    private var matcher = HabitMatcher()
+    private val gracePeriods = mutableMapOf<Long, Job>()
+    private val graceScope = CoroutineScope(SupervisorJob() + graceDispatcher)
     private val taskRunner: TaskRunner
 
     @Synchronized
@@ -184,7 +201,31 @@ class HabitCardListCache(
 
     @Synchronized
     fun setFilter(matcher: HabitMatcher) {
+        this.matcher = matcher
         filteredHabits = allHabits.getFiltered(matcher)
+    }
+
+    /**
+     * Keeps the habit's row visible for [GRACE_PERIOD], restarting the timer
+     * if it is already running. Call before saving a toggle.
+     */
+    @Synchronized
+    fun startGracePeriod(habitId: Long) {
+        gracePeriods.remove(habitId)?.cancel()
+        gracePeriods[habitId] = graceScope.launch {
+            delay(GRACE_PERIOD)
+            endGracePeriod(habitId)
+        }
+    }
+
+    /**
+     * Ends the habit's grace period now, so the filter applies to its row.
+     */
+    @Synchronized
+    fun endGracePeriod(habitId: Long) {
+        val job = gracePeriods.remove(habitId) ?: return
+        job.cancel()
+        refreshHabit(habitId)
     }
 
     @Synchronized
@@ -251,10 +292,19 @@ class HabitCardListCache(
 
         @Synchronized
         fun fetchHabits() {
-            for (h in filteredHabits) {
+            val visible = if (gracePeriods.isEmpty()) filteredHabits else habitsInGracePeriodOrFiltered()
+            for (h in visible) {
                 if (h.id == null) continue
                 habits.add(h)
                 idToHabit[h.id] = h
+            }
+        }
+
+        private fun habitsInGracePeriodOrFiltered(): List<Habit> {
+            val filteredIds = filteredHabits.mapNotNull { it.id }.toSet()
+            val graceMatcher = matcher.copy(isCompletedAllowed = true, isEnteredAllowed = true)
+            return allHabits.filter { h ->
+                h.id in filteredIds || (h.id in gracePeriods && graceMatcher.matches(h))
             }
         }
 
@@ -410,6 +460,10 @@ class HabitCardListCache(
             val removed = before - after
             for (id in removed) remove(id!!)
         }
+    }
+
+    companion object {
+        val GRACE_PERIOD = 2.seconds
     }
 
     init {

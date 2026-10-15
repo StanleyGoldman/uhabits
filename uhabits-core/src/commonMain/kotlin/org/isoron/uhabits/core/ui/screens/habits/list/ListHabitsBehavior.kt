@@ -47,13 +47,16 @@ open class ListHabitsBehavior(
     private val screen: Screen,
     private val commandRunner: CommandRunner,
     private val prefs: Preferences,
-    private val bugReporter: BugReporter
+    private val bugReporter: BugReporter,
+    private val cache: HabitCardListCache
 ) {
     open fun onClickHabit(h: Habit) {
         screen.showHabitScreen(h)
     }
 
     open fun onEdit(habit: Habit, date: LocalDate, x: Float, y: Float) {
+        // End the grace period as the popup opens, so the filters have applied by the time it closes
+        habit.id?.let { cache.endGracePeriod(it) }
         val entry = habit.computedEntries.get(date)
         if (habit.type == HabitType.NUMERICAL) {
             val oldValue = entry.value.toDouble() / 1000
@@ -133,6 +136,7 @@ open class ListHabitsBehavior(
     }
 
     open fun onToggle(habit: Habit, date: LocalDate, value: Int, notes: String, x: Float, y: Float) {
+        habit.id?.let { cache.startGracePeriod(it) }
         commandRunner.run(
             CreateRepetitionCommand(habitList, habit, date, value, notes)
         )

@@ -26,12 +26,15 @@ import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import dev.mokkery.spy
 import dev.mokkery.verify
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.runTest
 import org.isoron.platform.io.UserFile
 import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.BaseUnitTest
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
+import org.isoron.uhabits.core.models.HabitMatcher
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.ui.callbacks.NumberPickerCallback
 import kotlin.test.BeforeTest
@@ -45,6 +48,8 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
 
     private val prefs: Preferences = mock()
     private lateinit var behavior: ListHabitsBehavior
+    private lateinit var cache: HabitCardListCache
+    private val scheduler = TestCoroutineScheduler()
 
     private val screen: ListHabitsBehavior.Screen = mock()
     private lateinit var habit1: Habit
@@ -62,6 +67,8 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
         habitList.add(habit1)
         habitList.add(habit2)
         habitList = spy(habitList)
+        cache = HabitCardListCache(habitList, commandRunner, taskRunner, mock(), StandardTestDispatcher(scheduler))
+        cache.onAttached()
         behavior = ListHabitsBehavior(
             habitList,
             dirFinder,
@@ -69,7 +76,8 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
             screen,
             commandRunner,
             prefs,
-            bugReporter
+            bugReporter,
+            cache
         )
     }
 
@@ -172,5 +180,38 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
             y = 0f
         )
         assertFalse(habit1.isCompletedToday())
+    }
+
+    @Test
+    fun testOnToggle_keepsRowVisibleForGracePeriod() {
+        val h = addHabitHiddenOnceEntered()
+        behavior.onToggle(h, getToday(), Entry.YES_MANUAL, "", 0f, 0f)
+        assertTrue(isVisible(h))
+        scheduler.advanceTimeBy(2000)
+        scheduler.runCurrent()
+        assertFalse(isVisible(h))
+    }
+
+    @Test
+    fun testOnEdit_endsGracePeriod() {
+        every { screen.showCheckmarkPopup(any(), any(), any(), any()) } returns Unit
+        val h = addHabitHiddenOnceEntered()
+        behavior.onToggle(h, getToday(), Entry.YES_MANUAL, "", 0f, 0f)
+        behavior.onEdit(h, getToday(), 0f, 0f)
+        assertFalse(isVisible(h))
+    }
+
+    private fun addHabitHiddenOnceEntered(): Habit {
+        every { screen.showConfetti(any(), any(), any()) } returns Unit
+        val h = fixtures.createEmptyHabit()
+        habitList.add(h)
+        cache.setFilter(HabitMatcher(isEnteredAllowed = false))
+        cache.refreshAllHabits()
+        assertTrue(isVisible(h))
+        return h
+    }
+
+    private fun isVisible(h: Habit): Boolean {
+        return (0 until cache.habitCount).any { cache.getHabitByPosition(it) == h }
     }
 }

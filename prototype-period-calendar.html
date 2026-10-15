@@ -54,7 +54,7 @@
   <h1>PROTOTYPE · how the calendar and streak card draw period judging (#51) · throwaway</h1>
   <div class="row"><b>Scenario</b><span id="scenarios"></span></div>
   <div class="row"><b>Streak label</b><span id="labels"></span></div>
-  <div class="row"><b>Held days</b><span id="tails"></span></div>
+  <div class="row"><b>Open period</b><span id="tails"></span></div>
   <div class="row"><b>Theme</b><span id="themes"></span></div>
 </header>
 <main>
@@ -134,7 +134,7 @@ function periodBounds(n, period) {
   if (period === 'week') { const s = weekStart(n); return [s, s + 6]; }
   const p = parts(n); return [dn(p.y, p.m, 1), dn(p.y, p.m + 1, 1) - 1];
 }
-function judge(sc) {
+function judge(sc, openRule) {
   // history starts at the oldest entry (like computedEntries.getKnown), widened to its period in calendar mode
   const oldest = Math.min(...sc.e.keys());
   const from = sc.mode === 'calendar' ? periodBounds(oldest, sc.period)[0] : oldest;
@@ -177,7 +177,10 @@ function judge(sc) {
   // streaks: runs of met or open (held) days
   const streaks = []; let cur = null;
   for (let d = from; d <= TODAY; d++) {
-    const i = days.get(d); const ok = i && (i.status === 'met' || i.status === 'open');
+    const i = days.get(d);
+    // pending: the open period's days are left out of the streak (not counted, not broken) until it is met
+    if (openRule === 'pending' && i && i.status === 'open') continue;
+    const ok = i && (i.status === 'met' || i.status === 'open');
     if (ok) {
       if (!cur) cur = { start: d, end: d, held: 0, metPeriods: new Set() };
       cur.end = d; if (i.status === 'open') cur.held++;
@@ -365,7 +368,7 @@ const LABELS = {
   L2: 'After the end date: "Sep 27, 2026 · 4 weeks"',
   L3: 'Second line under the bar',
 };
-const TAILS = { plain: 'Plain bar', outlined: 'Held days outlined' };
+const OPENRULES = { hold: 'Hold: open days count now', pending: 'Pending: open days count once the period is met' };
 
 // ---------- state & render ----------
 const q = new URLSearchParams(location.search);
@@ -373,7 +376,7 @@ const state = {
   variant: q.get('variant') in VARIANTS ? q.get('variant') : 'A',
   scenario: q.get('scenario') in SCENARIOS ? q.get('scenario') : 'week',
   label: q.get('label') in LABELS ? q.get('label') : 'L1',
-  tail: q.get('tail') in TAILS ? q.get('tail') : 'plain',
+  open: q.get('open') in OPENRULES ? q.get('open') : 'pending',
   theme: q.get('theme') === 'dark' ? 'dark' : 'light',
 };
 function chips(el, obj, key, label = v => v) {
@@ -382,16 +385,16 @@ function chips(el, obj, key, label = v => v) {
 }
 function render() {
   document.body.classList.toggle('dark', state.theme === 'dark');
-  const sc = SCENARIOS[state.scenario], J = judge(sc), V = VARIANTS[state.variant];
+  const sc = SCENARIOS[state.scenario], J = judge(sc, state.open), V = VARIANTS[state.variant];
   chips('scenarios', SCENARIOS, 'scenario', s => s.title);
   chips('labels', LABELS, 'label', (t, k) => `${k}: ${t}`);
-  chips('tails', TAILS, 'tail');
+  chips('tails', OPENRULES, 'open');
   chips('themes', { light: 'Light', dark: 'Dark' }, 'theme');
   clipId = 0;
   const sq = Math.floor(330 / (sc.cols + 1.2));
   document.getElementById('history').innerHTML = historySvg(state.variant, sc, J, { cols: sc.cols, square: sq, theme: state.theme });
   document.getElementById('widget').innerHTML = historySvg(state.variant, sc, J, { cols: 6, square: 22, theme: state.theme, transparent: true });
-  document.getElementById('streaks').innerHTML = streakSvg(sc, J, { theme: state.theme, label: state.label, tail: state.tail });
+  document.getElementById('streaks').innerHTML = streakSvg(sc, J, { theme: state.theme, label: state.label });
   document.getElementById('vtitle').textContent = `Variant ${state.variant}: ${V.name}`;
   document.getElementById('vdesc').textContent = V.desc;
   document.getElementById('legend').innerHTML = legend(state.variant, sc);

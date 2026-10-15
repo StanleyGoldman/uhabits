@@ -70,7 +70,7 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
 ### Implementation
 
 - Load the `tdd` skill before writing the first test or line of code of an `/implement` run; the skill names `/tdd` only in passing, so it won't load unless you call it.
-- Run each slice red before green. A test written after its code has never been red: break the code it covers, watch the test fail, then restore the code.
+- Run each slice red before green. A test written after its code has never been red: break the code it covers, watch the test fail, then restore the code. For `uhabits-core` tests, run this red check with `.claude/scripts/red-check.sh`.
 
 ### Pull requests
 

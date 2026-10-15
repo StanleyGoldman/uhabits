@@ -120,20 +120,25 @@ class HabitsCSVExporterTest : BaseUnitTest() {
         val bytes = withDefaultLocale("de-DE") {
             HabitsCSVExporter(habitList, listOf(habit)).writeArchive()
         }
-        val checkmarks = ZipReader(bytes).entries().first { it.name.endsWith(" Run/Checkmarks.csv") }
-        val lines = checkmarks.content.trimEnd().lines()
-        assertEquals("2015-01-25,2.5,", lines[1])
-        assertEquals("2015-01-17,0.75,", lines.last())
+        val entries = ZipReader(bytes).entries()
+        val perHabit = entries.first { it.name.endsWith(" Run/Checkmarks.csv") }.content.trimEnd().lines()
+        assertEquals("2015-01-25,2.5,", perHabit[1])
+        assertEquals("2015-01-17,0.75,", perHabit.last())
+        val combined = entries.first { it.name == "Checkmarks.csv" }.content.trimEnd().lines()
+        assertEquals("2015-01-25,2.5,", combined[1])
+        assertEquals("2015-01-17,0.75,", combined.last())
     }
 
     @Test
-    fun testExportCSV_habitsListTheJudgingSettings() = runTest {
+    fun testExportCSV_habitsListTargetPeriodAssumeNoneAndSkipReminder() = runTest {
         val rolling = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_MOST)
+        rolling.name = "Rolling"
         rolling.targetPeriodMode = TargetPeriodMode.ROLLING
         rolling.assumeNone = false
         rolling.skipReminderIfLogged = true
         habitList.add(rolling)
         val calendar = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
+        calendar.name = "Calendar"
         habitList.add(calendar)
         val entries = ZipReader(HabitsCSVExporter(habitList, emptyList()).writeArchive()).entries()
         val lines = entries.first { it.name == "Habits.csv" }.content.trimEnd().lines()
@@ -143,13 +148,14 @@ class HabitsCSVExporterTest : BaseUnitTest() {
                 "Target Period,Assume None,Skip Reminder If Logged",
             lines[0]
         )
-        val settingsByName = lines.drop(1).map { line ->
+        // The last three columns of each row, keyed by habit name
+        val settingsByName = lines.drop(1).associate { line ->
             val cols = line.split(",")
-            cols[1] + " " + cols[9] to cols.takeLast(3)
-        }.toMap()
-        assertEquals(listOf("Rolling", "false", "true"), settingsByName.getValue("Run AT_MOST"))
-        assertEquals(listOf("Calendar", "true", "false"), settingsByName.getValue("Run AT_LEAST"))
-        assertEquals(listOf("", "", ""), settingsByName.getValue("Meditate "))
+            cols[1] to cols.takeLast(3)
+        }
+        assertEquals(listOf("Rolling", "false", "true"), settingsByName.getValue("Rolling"))
+        assertEquals(listOf("Calendar", "true", "false"), settingsByName.getValue("Calendar"))
+        assertEquals(listOf("", "", ""), settingsByName.getValue("Meditate"))
     }
 
     /**

@@ -49,6 +49,7 @@ import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.PaletteColor
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.tasks.TaskRunner
+import org.isoron.uhabits.core.ui.NumberField
 import org.isoron.uhabits.core.ui.ThemeSwitcher
 import org.isoron.uhabits.core.ui.callbacks.CheckMarkDialogCallback
 import org.isoron.uhabits.core.ui.callbacks.NumberPickerCallback
@@ -258,17 +259,13 @@ class ListHabitsScreen(
     }
 
     override fun showNumberPopup(
-        value: Double,
+        field: NumberField,
         notes: String,
         onDismiss: () -> Unit,
         callback: NumberPickerCallback
     ) {
         val fm = (context as AppCompatActivity).supportFragmentManager
-        val dialog = NumberDialog()
-        dialog.arguments = Bundle().apply {
-            putDouble("value", value)
-            putString("notes", notes)
-        }
+        val dialog = NumberDialog.newInstance(field, notes)
         dialog.onToggle = { v, n -> callback.onNumberPicked(v, n) }
         dialog.onDismiss = onDismiss
         dialog.dismissCurrentAndShow(fm, "numberDialog")

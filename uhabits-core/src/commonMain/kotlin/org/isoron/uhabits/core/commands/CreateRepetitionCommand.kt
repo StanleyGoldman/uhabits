@@ -36,6 +36,10 @@ data class CreateRepetitionCommand(
     constructor(habitList: HabitList, habit: Habit, date: LocalDate, value: Int, notes: String) :
         this(habitList, habit, date, value, null, notes)
 
+    /** Records [entry], in state and amount form, on its date. */
+    constructor(habitList: HabitList, habit: Habit, entry: Entry) :
+        this(habitList, habit, entry.date, entry.state, entry.amount, entry.notes)
+
     override fun run() {
         val entries = habit.originalEntries
         entries.add(Entry(date, state, amount, notes))

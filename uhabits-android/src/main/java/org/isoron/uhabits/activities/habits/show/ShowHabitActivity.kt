@@ -43,6 +43,7 @@ import org.isoron.uhabits.core.commands.CommandRunner
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.PaletteColor
 import org.isoron.uhabits.core.preferences.Preferences
+import org.isoron.uhabits.core.ui.NumberField
 import org.isoron.uhabits.core.ui.callbacks.CheckMarkDialogCallback
 import org.isoron.uhabits.core.ui.callbacks.NumberPickerCallback
 import org.isoron.uhabits.core.ui.callbacks.OnConfirmedCallback
@@ -173,15 +174,11 @@ class ShowHabitActivity : AppCompatActivity(), CommandRunner.Listener {
         }
 
         override fun showNumberPopup(
-            value: Double,
+            field: NumberField,
             notes: String,
             callback: NumberPickerCallback
         ) {
-            val dialog = NumberDialog()
-            dialog.arguments = Bundle().apply {
-                putDouble("value", value)
-                putString("notes", notes)
-            }
+            val dialog = NumberDialog.newInstance(field, notes)
             dialog.onToggle = { v, n -> callback.onNumberPicked(v, n) }
             dialog.dismissCurrentAndShow(supportFragmentManager, "numberDialog")
         }

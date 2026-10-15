@@ -26,6 +26,7 @@ import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import dev.mokkery.spy
 import dev.mokkery.verify
+import dev.mokkery.verify.VerifyMode
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.runTest
@@ -36,6 +37,8 @@ import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitMatcher
 import org.isoron.uhabits.core.preferences.Preferences
+import org.isoron.uhabits.core.ui.NumberField
+import org.isoron.uhabits.core.ui.NumberInput
 import org.isoron.uhabits.core.ui.callbacks.CheckMarkDialogCallback
 import org.isoron.uhabits.core.ui.callbacks.NumberPickerCallback
 import kotlin.test.BeforeTest
@@ -93,9 +96,9 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
         }
         behavior.onEdit(habit2, today, 0f, 0f)
         verify {
-            screen.showNumberPopup(0.1, "", any(), any())
+            screen.showNumberPopup(NumberField("0.1", false), "", any(), any())
         }
-        capturedPicker!!.onNumberPicked(100.0, "")
+        capturedPicker!!.onNumberPicked(NumberInput.Typed("100"), "")
         assertEquals(100000, habit2.computedEntries.get(today).value)
     }
 
@@ -214,6 +217,94 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
         assertFalse(isVisible(h))
     }
 
+    @Test
+    fun testOnEdit_skippedDayOpensEmptyWithSkippedHint() {
+        val (field, _) = openNumberPopup(Entry(getToday(), Entry.SKIP, null))
+        assertEquals(NumberField("", isSkipped = true), field)
+    }
+
+    @Test
+    fun testOnEdit_unknownDayOpensEmpty() {
+        val (field, _) = openNumberPopup(Entry(getToday(), Entry.UNKNOWN, null))
+        assertEquals(NumberField("", isSkipped = false), field)
+    }
+
+    @Test
+    fun testOnEdit_savingEmptyFieldKeepsStateAndSavesNotes() {
+        val (_, picker) = openNumberPopup(Entry(getToday(), Entry.SKIP, null))
+        picker.onNumberPicked(NumberInput.Typed(""), "sick")
+        assertEquals(Entry(getToday(), Entry.SKIP, null, "sick"), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_clearingAnAmountMakesTheDayUnknown() {
+        val (_, picker) = openNumberPopup(Entry(getToday(), Entry.AMOUNT, 2500))
+        picker.onNumberPicked(NumberInput.Typed(""), "")
+        assertEquals(Entry(getToday(), Entry.UNKNOWN, null), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_skipWritesTheSkipState() {
+        val (_, picker) = openNumberPopup(Entry(getToday(), Entry.AMOUNT, 2500))
+        picker.onNumberPicked(NumberInput.Skip, "")
+        assertEquals(Entry(getToday(), Entry.SKIP, null), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_unknownWritesTheUnknownState() {
+        val (_, picker) = openNumberPopup(Entry(getToday(), Entry.AMOUNT, 2500))
+        picker.onNumberPicked(NumberInput.Unknown, "")
+        assertEquals(Entry(getToday(), Entry.UNKNOWN, null), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_typingATinyAmountWritesAnAmountNotASkip() {
+        val (_, picker) = openNumberPopup(Entry(getToday(), Entry.UNKNOWN, null))
+        picker.onNumberPicked(NumberInput.Typed("0.003"), "")
+        assertEquals(Entry(getToday(), Entry.AMOUNT, 0), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_leftoverThreeDecimalAmountShowsRounded() {
+        val (field, _) = openNumberPopup(Entry(getToday(), Entry.AMOUNT, 1235))
+        assertEquals(NumberField("1.24", isSkipped = false), field)
+    }
+
+    @Test
+    fun testOnEdit_savingAnUntouchedFieldKeepsTheAmount() {
+        val (field, picker) = openNumberPopup(Entry(getToday(), Entry.AMOUNT, 1235))
+        picker.onNumberPicked(NumberInput.Typed(field.text), "")
+        assertEquals(Entry(getToday(), Entry.AMOUNT, 1235), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_aHugeAmountIsCappedNotWrapped() {
+        val (_, picker) = openNumberPopup(Entry(getToday(), Entry.UNKNOWN, null))
+        picker.onNumberPicked(NumberInput.Typed("3000000"), "")
+        assertEquals(Entry(getToday(), Entry.AMOUNT, Int.MAX_VALUE), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_aCommaWorksAsTheDecimalPoint() {
+        val (_, picker) = openNumberPopup(Entry(getToday(), Entry.UNKNOWN, null))
+        picker.onNumberPicked(NumberInput.Typed("1,5"), "")
+        assertEquals(Entry(getToday(), Entry.AMOUNT, 1500), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_savingAnUntouchedFieldWithACommaKeepsTheAmount() {
+        openNumberPopup(Entry(getToday(), Entry.AMOUNT, 1235)).second
+            .onNumberPicked(NumberInput.Typed("1,24"), "")
+        assertEquals(Entry(getToday(), Entry.AMOUNT, 1235), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_savingAnUntouchedOldFormAmountShowsNoConfetti() {
+        val (field, picker) = openNumberPopup(Entry(getToday(), 2500))
+        picker.onNumberPicked(NumberInput.Typed(field.text), "")
+        verify(VerifyMode.not) { screen.showConfetti(any(), any(), any()) }
+    }
+
     private fun addHabitHiddenOnceEntered(): Habit {
         every { screen.showConfetti(any(), any(), any()) } returns Unit
         val h = fixtures.createEmptyHabit()
@@ -227,4 +318,21 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
     private fun isVisible(h: Habit): Boolean {
         return (0 until cache.habitCount).any { cache.getHabitByPosition(it) == h }
     }
+
+    private fun openNumberPopup(today: Entry): Pair<NumberField, NumberPickerCallback> {
+        var field: NumberField? = null
+        var picker: NumberPickerCallback? = null
+        every { screen.showNumberPopup(any(), any(), any(), any()) } calls { args ->
+            field = args.arg<NumberField>(0)
+            picker = args.arg<NumberPickerCallback>(3)
+            Unit
+        }
+        every { screen.showConfetti(any(), any(), any()) } returns Unit
+        habit2.originalEntries.add(today)
+        habit2.recompute()
+        behavior.onEdit(habit2, getToday(), 0f, 0f)
+        return field!! to picker!!
+    }
+
+    private fun todayEntry(): Entry = habit2.originalEntries.get(getToday())
 }

@@ -100,6 +100,26 @@ class ImportTest : BaseUnitTest() {
     }
 
     @Test
+    fun testHabitBullCSVDecidesTypeBeforeWritingEntries() = runTest {
+        importFromFile("habitbull5.csv")
+        assertEquals(2, habitList.size())
+
+        val water = habitList.first { it.name == "Water" }
+        assertEquals(HabitType.NUMERICAL, water.type)
+        fun waterEntry(day: Int) = water.originalEntries.get(LocalDate(2023, 5, day))
+        assertEquals(Entry(LocalDate(2023, 5, 1), Entry.AMOUNT, 1000, "first"), waterEntry(1))
+        assertEquals(Entry(LocalDate(2023, 5, 2), Entry.AMOUNT, 3000), waterEntry(2))
+        assertEquals(Entry(LocalDate(2023, 5, 3), Entry.AMOUNT, 0), waterEntry(3))
+        assertEquals(Entry(LocalDate(2023, 5, 4), Entry.AMOUNT, 1000, "last"), waterEntry(4))
+
+        val meditate = habitList.first { it.name == "Meditate" }
+        assertEquals(HabitType.YES_NO, meditate.type)
+        fun meditateEntry(day: Int) = meditate.originalEntries.get(LocalDate(2023, 5, day))
+        assertEquals(Entry(LocalDate(2023, 5, 1), Entry.YES_MANUAL, null, "calm"), meditateEntry(1))
+        assertEquals(Entry(LocalDate(2023, 5, 2), Entry.NO, null), meditateEntry(2))
+    }
+
+    @Test
     fun testLoopDB() = runTest {
         importFromFile("loop.db")
         assertEquals(9, habitList.size())

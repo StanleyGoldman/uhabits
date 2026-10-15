@@ -1,0 +1,7 @@
+HabitName,HabitDescription,HabitCategory,CalendarDate,Value,CommentText
+Water,glasses,Health,2023-05-01,1,first
+Meditate,,Mind,2023-05-01,1,calm
+Water,glasses,Health,2023-05-02,3,
+Meditate,,Mind,2023-05-02,0,
+Water,glasses,Health,2023-05-03,0,
+Water,glasses,Health,2023-05-04,1,last

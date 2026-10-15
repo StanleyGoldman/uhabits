@@ -216,6 +216,8 @@ class EditHabitActivity : AppCompatActivity() {
 
         binding.numericalFrequencyPicker.setOnClickListener {
             val options = MeasurableFrequencyOption.entries
+            val firstWeekday = (application as HabitsApplication).component.preferences.firstWeekday
+            val weekdayNames = JavaLocalDateFormatter(Locale.getDefault()).longWeekdayNames(firstWeekday)
             val adapter = object : ArrayAdapter<MeasurableFrequencyOption>(
                 this,
                 R.layout.dialog_item_with_hint,
@@ -227,7 +229,7 @@ class EditHabitActivity : AppCompatActivity() {
                     val option = options[position]
                     view.findViewById<TextView>(android.R.id.text1).text =
                         formatFrequency(option.label, resources)
-                    val hint = formatFrequencyHint(option)
+                    val hint = formatFrequencyHint(option, weekdayNames)
                     view.findViewById<TextView>(android.R.id.text2).apply {
                         text = hint
                         visibility = if (hint == null) View.GONE else View.VISIBLE
@@ -248,8 +250,9 @@ class EditHabitActivity : AppCompatActivity() {
         }
 
         populateAssumeNone()
-        binding.assumeNoneRow.setOnClickListener {
-            assumeNone = !assumeNone
+        binding.assumeNoneRow.setOnClickListener { binding.assumeNoneSwitch.toggle() }
+        binding.assumeNoneSwitch.setOnCheckedChangeListener { _, isChecked ->
+            assumeNone = isChecked
             populateAssumeNone()
         }
 
@@ -398,13 +401,17 @@ class EditHabitActivity : AppCompatActivity() {
         )
     }
 
-    private fun formatFrequencyHint(option: MeasurableFrequencyOption): String? = when (option) {
+    /** [weekdayNames] are the week's day names, starting on the first day of the week. */
+    private fun formatFrequencyHint(
+        option: MeasurableFrequencyOption,
+        weekdayNames: Array<String>
+    ): String? = when (option) {
         MeasurableFrequencyOption.EVERY_DAY -> null
-        MeasurableFrequencyOption.EVERY_WEEK -> {
-            val firstWeekday = (application as HabitsApplication).component.preferences.firstWeekday
-            val names = JavaLocalDateFormatter(Locale.getDefault()).longWeekdayNames(firstWeekday)
-            getString(R.string.frequency_hint_calendar_week, names.first(), names.last())
-        }
+        MeasurableFrequencyOption.EVERY_WEEK -> getString(
+            R.string.frequency_hint_calendar_week,
+            weekdayNames.first(),
+            weekdayNames.last()
+        )
         MeasurableFrequencyOption.EVERY_7_DAYS -> getString(R.string.frequency_hint_rolling, 7)
         MeasurableFrequencyOption.EVERY_MONTH -> getString(R.string.frequency_hint_calendar_month)
         MeasurableFrequencyOption.EVERY_30_DAYS -> getString(R.string.frequency_hint_rolling, 30)

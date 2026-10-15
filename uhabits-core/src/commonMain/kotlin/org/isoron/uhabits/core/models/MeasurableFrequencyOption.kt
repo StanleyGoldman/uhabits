@@ -37,7 +37,11 @@ enum class MeasurableFrequencyOption(
         get() = Frequency(1, denominator)
 
     val label: FrequencyLabel
-        get() = FrequencyLabel.of(frequency, true, mode ?: TargetPeriodMode.CALENDAR)
+        get() = FrequencyLabel.of(
+            frequency,
+            isNumerical = true,
+            targetPeriodMode = mode ?: TargetPeriodMode.CALENDAR
+        )
 
     fun targetPeriodMode(stored: TargetPeriodMode): TargetPeriodMode = mode ?: stored
 }

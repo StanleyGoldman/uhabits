@@ -49,14 +49,8 @@ sealed class FrequencyLabel {
             val num = frequency.numerator
             val den = frequency.denominator
             val isRolling = isNumerical && targetPeriodMode == TargetPeriodMode.ROLLING
-            if (isRolling && num == 1 && den > 1) return EveryXDays(den)
-            return ofFrequency(frequency)
-        }
-
-        private fun ofFrequency(frequency: Frequency): FrequencyLabel {
-            val num = frequency.numerator
-            val den = frequency.denominator
             return when {
+                isRolling && num == 1 && den > 1 -> EveryXDays(den)
                 num == 1 && (den == 30 || den == 31) -> EveryMonth
                 den == 30 || den == 31 -> XTimesPerMonth(num)
                 num == 1 && den == 1 -> EveryDay

@@ -48,7 +48,6 @@ class CheckmarkWidgetViewTest : BaseViewTest() {
         view = CheckmarkWidgetView(targetContext).apply {
             activeColor = getAndroidTestColor(0)
             entryState = computedEntries.get(today).value
-            entryValue = computedEntries.get(today).value
             percentage = score.toFloat()
             name = habit.name
         }

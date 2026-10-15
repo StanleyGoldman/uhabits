@@ -113,6 +113,7 @@ class HabitCardListView(
         habit: Habit,
         score: Double,
         checkmarks: IntArray,
+        states: IntArray,
         notes: Array<String>,
         selected: Boolean
     ): View {
@@ -120,6 +121,7 @@ class HabitCardListView(
         cardView.habit = habit
         cardView.isSelected = selected
         cardView.values = checkmarks
+        cardView.states = states
         cardView.buttonCount = checkmarkCount
         cardView.dataOffset = dataOffset
         cardView.score = score

@@ -21,7 +21,9 @@ package org.isoron.uhabits.core.models
 
 import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.TruncateField
+import org.isoron.uhabits.core.models.Entry.Companion.AMOUNT
 import org.isoron.uhabits.core.models.Entry.Companion.NO
+import org.isoron.uhabits.core.models.Entry.Companion.SKIP
 import org.isoron.uhabits.core.models.Entry.Companion.UNKNOWN
 import org.isoron.uhabits.core.models.Entry.Companion.YES_AUTO
 import org.isoron.uhabits.core.models.Entry.Companion.YES_MANUAL
@@ -380,6 +382,21 @@ class EntryListTest {
                 assertContentEquals(weekdayCount[month], actualCount)
             }
         }
+    }
+
+    @Test
+    fun testWeekdayFrequency_numericalSumsOnlyAmounts() {
+        val entries = EntryList()
+        entries.add(Entry(LocalDate(2015, 1, 5), AMOUNT, 5000)) // Monday
+        entries.add(Entry(LocalDate(2015, 1, 12), SKIP, null)) // Monday
+        entries.add(Entry(LocalDate(2015, 1, 19), UNKNOWN, null, "rest day")) // Monday
+        entries.add(Entry(LocalDate(2015, 1, 6), SKIP, null)) // Tuesday
+        entries.add(Entry(LocalDate(2015, 1, 7), AMOUNT, 0)) // Wednesday
+
+        val freq = entries.computeWeekdayFrequency(isNumerical = true)
+
+        // Saturday first, then Sunday, Monday, ...
+        assertContentEquals(arrayOf(0, 0, 5000, 0, 0, 0, 0), freq[LocalDate(2015, 1, 1)])
     }
 
     fun day(offset: Int): LocalDate = LocalDate(2015, 1, 25).minus(offset)

@@ -32,6 +32,7 @@ import org.isoron.uhabits.core.commands.DeleteHabitsCommand
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitMatcher
+import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.ui.screens.habits.list.HabitCardListCache.Companion.GRACE_PERIOD
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -102,6 +103,24 @@ class HabitCardListCacheTest : BaseUnitTest() {
             .getByInterval(today.minus(9), today)
             .map { it.value }.toIntArray()
         assertContentEquals(expectedCheckmarks, actualCheckmarks)
+    }
+
+    @Test
+    fun testGetStates_measurableHabitKeepsSkipApartFromAmount() {
+        val h = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_MOST)
+        h.originalEntries.add(Entry(today, Entry.AMOUNT, 3))
+        h.originalEntries.add(Entry(today.minus(1), Entry.SKIP, null))
+        h.originalEntries.add(Entry(today.minus(2), Entry.UNKNOWN, null, "rest day"))
+        h.recompute()
+        habitList.add(h)
+        cache.refreshAllHabits()
+
+        val states = cache.getStates(h.id!!)
+
+        assertContentEquals(
+            intArrayOf(Entry.AMOUNT, Entry.SKIP, Entry.UNKNOWN),
+            states.sliceArray(0..2)
+        )
     }
 
     @Test

@@ -30,7 +30,9 @@ import android.view.View.OnClickListener
 import android.view.View.OnLongClickListener
 import me.tatarka.inject.annotations.Inject
 import org.isoron.uhabits.R
-import org.isoron.uhabits.core.models.Entry
+import org.isoron.uhabits.core.models.Entry.Companion.AMOUNT
+import org.isoron.uhabits.core.models.Entry.Companion.SKIP
+import org.isoron.uhabits.core.models.Entry.Companion.UNKNOWN
 import org.isoron.uhabits.core.models.NumericalHabitType.AT_LEAST
 import org.isoron.uhabits.core.models.NumericalHabitType.AT_MOST
 import org.isoron.uhabits.core.preferences.Preferences
@@ -80,6 +82,12 @@ class NumberButtonView(
         }
 
     var value = 0.0
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    var state = AMOUNT
         set(value) {
             field = value
             invalidate()
@@ -175,7 +183,8 @@ class NumberButtonView(
 
         fun draw(canvas: Canvas) {
             val activeColor = when {
-                value < 0.0 -> lowContrast
+                state == UNKNOWN -> lowContrast
+                state == SKIP -> mediumContrast
                 (targetType == AT_LEAST) && (value >= threshold) -> color
                 (targetType == AT_MOST) && (value <= threshold) -> color
                 else -> mediumContrast
@@ -186,13 +195,13 @@ class NumberButtonView(
             val textSize: Float
 
             when {
-                value == Entry.SKIP.toDouble() / 1000 -> {
+                state == SKIP -> {
                     label = resources.getString(R.string.fa_skipped)
                     textSize = dim(R.dimen.smallTextSize)
                     typeface = getFontAwesome()
                 }
 
-                value >= 0 -> {
+                state == AMOUNT -> {
                     label = value.toShortString()
                     typeface = BOLD_TYPEFACE
                     textSize = dim(R.dimen.smallTextSize)

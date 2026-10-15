@@ -23,6 +23,7 @@ import android.content.Context
 import me.tatarka.inject.annotations.Inject
 import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.getToday
+import org.isoron.uhabits.core.models.Entry.Companion.AMOUNT
 import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.inject.ActivityContext
@@ -45,6 +46,12 @@ class NumberPanelView(
     var values = DoubleArray(0)
         set(values) {
             field = values
+            setupButtons()
+        }
+
+    var states = IntArray(0)
+        set(states) {
+            field = states
             setupButtons()
         }
 
@@ -95,6 +102,10 @@ class NumberPanelView(
             button.value = when {
                 index + dataOffset < values.size -> values[index + dataOffset]
                 else -> 0.0
+            }
+            button.state = when {
+                index + dataOffset < states.size -> states[index + dataOffset]
+                else -> AMOUNT
             }
             button.notes = when {
                 index + dataOffset < notes.size -> notes[index + dataOffset]

@@ -117,7 +117,7 @@ A 0–100% measure of how established a habit is, weighted toward recent days, s
 _Avoid_: Habit strength, progress, percentage
 
 **Streak**:
-A run of consecutive met days, counted in days. A weekly or monthly measurable habit joins its streak a whole target period at a time: an open period is pending, neither extending nor breaking the streak, and joins once it is met; a missed period ends the streak at the period before it; a period of only skips bridges it. In calendar mode the streak also counts its met weeks or months ("35 · 5 weeks"). In rolling mode each day joins by its own window, and days after today wait until they come.
+Consecutive met days, counted in days. A weekly or monthly measurable habit joins its streak a whole target period at a time: an open period is pending, neither extending nor breaking the streak, and joins once it is met; a missed period ends the streak at the period before it; a period of only skips bridges a running streak, adding its days but not counting as met. In calendar mode the streak also counts its met weeks or months ("35 · 5 weeks"). In rolling mode each day joins by its own window. A measurable streak never reaches past the day or period holding today.
 _Avoid_: Chain, run
 
 **Today**:

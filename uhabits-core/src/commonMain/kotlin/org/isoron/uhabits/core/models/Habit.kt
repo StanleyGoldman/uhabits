@@ -134,25 +134,44 @@ data class Habit(
     }
 
     /**
+     * The length of a weekly or monthly measurable habit's target period, or
+     * null for a daily or yes-or-no habit. A monthly habit may be stored as
+     * 1/30 or 1/31.
+     */
+    private val periodUnit: PeriodUnit?
+        get() {
+            if (!isNumerical) return null
+            return when (frequency.denominator) {
+                7 -> PeriodUnit.WEEK
+                30, 31 -> PeriodUnit.MONTH
+                else -> null
+            }
+        }
+
+    /**
      * The days whose total is judged against the target on [date]: the
      * calendar week or month holding it, the rolling window of the last 7 or
-     * 30 days ending on it, or null for a daily habit. A monthly habit may be
-     * stored as 1/30 or 1/31; either way its rolling window is 30 days.
+     * 30 days ending on it, or null for a daily habit. A rolling month is
+     * 30 days however the frequency is stored.
      */
     private fun targetPeriod(date: LocalDate): ClosedRange<LocalDate>? {
         val isRolling = targetPeriodMode == TargetPeriodMode.ROLLING
-        return when (frequency.denominator) {
-            7 -> when {
+        return when (periodUnit) {
+            PeriodUnit.WEEK -> when {
                 isRolling -> date.minus(6)..date
                 else -> date.startOfWeek(getFirstWeekday()).let { it..it.plus(6) }
             }
-            30, 31 -> when {
+            PeriodUnit.MONTH -> when {
                 isRolling -> date.minus(29)..date
                 else -> date.startOfMonth().let { it..it.plus(it.monthLength - 1) }
             }
-            else -> null
+            null -> null
         }
     }
+
+    /** The unit of [calendarPeriod], or null when the habit has none. */
+    internal val calendarPeriodUnit: PeriodUnit?
+        get() = periodUnit.takeIf { targetPeriodMode == TargetPeriodMode.CALENDAR }
 
     /**
      * The calendar week or month holding [date] for a weekly or monthly
@@ -163,17 +182,6 @@ data class Habit(
         if (calendarPeriodUnit == null) return null
         return targetPeriod(date)
     }
-
-    /** The unit of [calendarPeriod], or null when the habit has none. */
-    internal val calendarPeriodUnit: PeriodUnit?
-        get() {
-            if (!isNumerical || targetPeriodMode != TargetPeriodMode.CALENDAR) return null
-            return when (frequency.denominator) {
-                7 -> PeriodUnit.WEEK
-                30, 31 -> PeriodUnit.MONTH
-                else -> null
-            }
-        }
 
     /**
      * The verdict of a target period, or null when every day in it is
@@ -228,7 +236,7 @@ data class Habit(
             today = today
         )
 
-        streaks.recompute(this, from, to)
+        streaks.recompute(this, from, to, today)
     }
 
     fun copyFrom(other: Habit) {

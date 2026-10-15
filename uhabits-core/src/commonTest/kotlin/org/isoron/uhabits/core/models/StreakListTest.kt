@@ -88,7 +88,7 @@ class StreakListTest : BaseUnitTest() {
     }
 
     @Test
-    fun testCalendarWeek_aShortPeriodEndsTheStreakAtThePreviousPeriod() {
+    fun testCalendarWeek_aMissedPeriodEndsTheStreakAtThePreviousPeriod() {
         val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0, Frequency.WEEKLY)
         h.withAmountOn(LocalDate(2015, 1, 5), 10.0)
         h.withAmountOn(LocalDate(2015, 1, 12), 10.0)
@@ -110,8 +110,35 @@ class StreakListTest : BaseUnitTest() {
         for (day in 11..17) h.originalEntries.add(Entry(LocalDate(2015, 1, day), Entry.SKIP))
         h.withAmountOn(LocalDate(2015, 1, 20), 10.0)
         assertEquals(
-            listOf(LocalDate(2015, 1, 4)..LocalDate(2015, 1, 24)),
-            h.streaks.getBest(5).map { it.start..it.end }
+            listOf(Triple(LocalDate(2015, 1, 4), LocalDate(2015, 1, 24), 2)),
+            h.streaks.getBest(5).map { Triple(it.start, it.end, it.periodCount) },
+            "the skipped week's days join, but it isn't a met week"
+        )
+    }
+
+    @Test
+    fun testCalendarWeek_skippedWeeksAloneMakeNoStreak() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0, Frequency.WEEKLY)
+        h.withAmountOn(LocalDate(2015, 1, 5), 9.0)
+        for (day in 11..17) h.originalEntries.add(Entry(LocalDate(2015, 1, day), Entry.SKIP))
+        for (day in 1..7) h.originalEntries.add(Entry(LocalDate(2015, 2, day), Entry.SKIP))
+        h.recompute()
+        assertEquals(
+            emptyList(),
+            h.streaks.getBest(5).map { it.start..it.end },
+            "a skipped week after a missed one, and one skipped ahead of time"
+        )
+    }
+
+    @Test
+    fun testCalendarWeek_atMostCurrentWeekIsPending() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_MOST, 4.0, Frequency.WEEKLY)
+        h.withAmountOn(LocalDate(2015, 1, 20), 3.0)
+        h.withAmountOn(today, 1.0)
+        assertEquals(
+            listOf(Pair(LocalDate(2015, 1, 18)..LocalDate(2015, 1, 24), 1)),
+            h.streaks.getBest(5).map { Pair(it.start..it.end, it.periodCount) },
+            "an \"at most\" week is never met before it closes"
         )
     }
 

@@ -20,7 +20,6 @@ package org.isoron.uhabits.core.models
 
 import org.isoron.platform.Synchronized
 import org.isoron.platform.time.LocalDate
-import org.isoron.platform.time.getToday
 import kotlin.math.min
 
 class StreakList {
@@ -39,37 +38,37 @@ class StreakList {
      * A calendar week or month is judged as a whole: once met, all its days
      * join the streak. An open day or period is pending: only the current
      * one or those to come can be open, so the streak ends just before it
-     * until it is met. A period of only skips bridges the streak like a
-     * skipped day.
+     * until it is met. A period of only skips bridges a running streak: its
+     * days join, but it isn't a met period. A measurable habit's streaks stop
+     * at the day or period holding [today].
      */
     @Synchronized
-    fun recompute(habit: Habit, from: LocalDate, to: LocalDate) {
+    fun recompute(habit: Habit, from: LocalDate, to: LocalDate, today: LocalDate) {
         list.clear()
         val unit = habit.calendarPeriodUnit
         var begin: LocalDate? = null
         var end: LocalDate? = null
         var periodCount = 0
-        fun close() {
+        fun endStreak() {
             if (begin != null) list.add(Streak(begin!!, end!!, periodCount, unit))
             begin = null
             periodCount = 0
         }
-        // A measurable day judged alone or by its rolling window is pending
-        // until it comes, even if its window already holds enough.
-        val last = if (habit.isNumerical && unit == null) minOf(to, getToday()) else to
+        val last = if (habit.isNumerical) minOf(to, today) else to
         var date = from
         while (date <= last) {
             val span = habit.calendarPeriod(date) ?: date..date
             when (habit.statusOn(date)) {
-                DayStatus.MET, null -> {
+                DayStatus.MET -> {
                     if (begin == null) begin = span.start
                     end = span.endInclusive
                     if (unit != null) periodCount++
                 }
-                else -> close()
+                null -> if (begin != null) end = span.endInclusive
+                else -> endStreak()
             }
             date = span.endInclusive.plus(1)
         }
-        close()
+        endStreak()
     }
 }

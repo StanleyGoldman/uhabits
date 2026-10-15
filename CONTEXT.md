@@ -86,7 +86,7 @@ An entry where the user recorded not doing the habit. Called a "lapse" in settin
 _Avoid_: Fail, miss, unchecked
 
 **Skip**:
-An entry marking the day as not applicable (e.g. sick, travelling), so it neither helps nor hurts. Only available when skip days are enabled.
+An entry marking the day as not applicable (e.g. sick, travelling), so it neither helps nor hurts. Only available when skip days are enabled. On a weekly or monthly measurable habit, a skipped day drops out of its target period and the target scales to the days left.
 _Avoid_: Excused day, rest day, freeze
 
 **Unknown**:

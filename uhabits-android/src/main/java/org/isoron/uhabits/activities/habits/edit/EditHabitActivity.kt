@@ -27,14 +27,18 @@ import android.text.Html
 import android.text.Spanned
 import android.text.format.DateFormat
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.widget.CompoundButtonCompat
 import androidx.fragment.app.DialogFragment
 import com.android.datetimepicker.time.RadialPickerLayout
 import com.android.datetimepicker.time.TimePickerDialog
 import org.isoron.platform.gui.toInt
+import org.isoron.platform.time.JavaLocalDateFormatter
 import org.isoron.uhabits.HabitsApplication
 import org.isoron.uhabits.R
 import org.isoron.uhabits.activities.AndroidThemeSwitcher
@@ -45,28 +49,34 @@ import org.isoron.uhabits.core.commands.CommandRunner
 import org.isoron.uhabits.core.commands.CreateHabitCommand
 import org.isoron.uhabits.core.commands.EditHabitCommand
 import org.isoron.uhabits.core.models.Frequency
+import org.isoron.uhabits.core.models.FrequencyLabel
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitType
+import org.isoron.uhabits.core.models.MeasurableFrequencyOption
 import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.models.PaletteColor
 import org.isoron.uhabits.core.models.Reminder
+import org.isoron.uhabits.core.models.TargetPeriodMode
 import org.isoron.uhabits.core.models.WeekdayList
 import org.isoron.uhabits.databinding.ActivityEditHabitBinding
+import org.isoron.uhabits.utils.StyledResources
 import org.isoron.uhabits.utils.applyBottomInset
 import org.isoron.uhabits.utils.applyRootViewInsets
 import org.isoron.uhabits.utils.applyToolbarInsets
 import org.isoron.uhabits.utils.dismissCurrentAndShow
 import org.isoron.uhabits.utils.formatTime
 import org.isoron.uhabits.utils.toFormattedString
+import java.util.Locale
 
-fun formatFrequency(freqNum: Int, freqDen: Int, resources: Resources) = when {
-    freqNum == 1 && (freqDen == 30 || freqDen == 31) -> resources.getString(R.string.every_month)
-    freqDen == 30 || freqDen == 31 -> resources.getString(R.string.x_times_per_month, freqNum)
-    freqNum == 1 && freqDen == 1 -> resources.getString(R.string.every_day)
-    freqNum == 1 && freqDen == 7 -> resources.getString(R.string.every_week)
-    freqNum == 1 && freqDen > 1 -> resources.getString(R.string.every_x_days, freqDen)
-    freqDen == 7 -> resources.getString(R.string.x_times_per_week, freqNum)
-    else -> resources.getString(R.string.x_times_per_y_days, freqNum, freqDen)
+fun formatFrequency(label: FrequencyLabel, resources: Resources): String = when (label) {
+    FrequencyLabel.EveryDay -> resources.getString(R.string.every_day)
+    FrequencyLabel.EveryWeek -> resources.getString(R.string.every_week)
+    FrequencyLabel.EveryMonth -> resources.getString(R.string.every_month)
+    is FrequencyLabel.EveryXDays -> resources.getString(R.string.every_x_days, label.days)
+    is FrequencyLabel.XTimesPerWeek -> resources.getString(R.string.x_times_per_week, label.times)
+    is FrequencyLabel.XTimesPerMonth -> resources.getString(R.string.x_times_per_month, label.times)
+    is FrequencyLabel.XTimesPerYDays ->
+        resources.getString(R.string.x_times_per_y_days, label.times, label.days)
 }
 
 class EditHabitActivity : AppCompatActivity() {
@@ -86,6 +96,9 @@ class EditHabitActivity : AppCompatActivity() {
     var reminderMin = -1
     var reminderDays: WeekdayList = WeekdayList.EVERY_DAY
     var targetType = NumericalHabitType.AT_LEAST
+    var targetPeriodMode = TargetPeriodMode.CALENDAR
+    var assumeNone = true
+    var skipReminderIfLogged = false
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -109,6 +122,9 @@ class EditHabitActivity : AppCompatActivity() {
             freqNum = habit.frequency.numerator
             freqDen = habit.frequency.denominator
             targetType = habit.targetType
+            targetPeriodMode = habit.targetPeriodMode
+            assumeNone = habit.assumeNone
+            skipReminderIfLogged = habit.skipReminderIfLogged
             habit.reminder?.let {
                 reminderHour = it.hour
                 reminderMin = it.minute
@@ -132,6 +148,10 @@ class EditHabitActivity : AppCompatActivity() {
             reminderHour = state.getInt("reminderHour")
             reminderMin = state.getInt("reminderMin")
             reminderDays = WeekdayList(state.getInt("reminderDays"))
+            targetType = NumericalHabitType.fromInt(state.getInt("targetType"))
+            targetPeriodMode = TargetPeriodMode.fromInt(state.getInt("targetPeriodMode"))
+            assumeNone = state.getBoolean("assumeNone")
+            skipReminderIfLogged = state.getBoolean("skipReminderIfLogged")
         }
 
         updateColors()
@@ -187,6 +207,7 @@ class EditHabitActivity : AppCompatActivity() {
                     else -> NumericalHabitType.AT_MOST
                 }
                 populateTargetType()
+                populateAssumeNone()
                 dialog.dismiss()
             }
             val dialog = builder.create()
@@ -194,21 +215,49 @@ class EditHabitActivity : AppCompatActivity() {
         }
 
         binding.numericalFrequencyPicker.setOnClickListener {
-            val builder = AlertDialog.Builder(this)
-            val arrayAdapter = ArrayAdapter<String>(this, android.R.layout.select_dialog_item)
-            arrayAdapter.add(getString(R.string.every_day))
-            arrayAdapter.add(getString(R.string.every_week))
-            arrayAdapter.add(getString(R.string.every_month))
-            builder.setAdapter(arrayAdapter) { dialog, which ->
-                freqDen = when (which) {
-                    1 -> 7
-                    2 -> 30
-                    else -> 1
+            val options = MeasurableFrequencyOption.entries
+            val firstWeekday = (application as HabitsApplication).component.preferences.firstWeekday
+            val weekdayNames = JavaLocalDateFormatter(Locale.getDefault()).longWeekdayNames(firstWeekday)
+            val adapter = object : ArrayAdapter<MeasurableFrequencyOption>(
+                this,
+                R.layout.dialog_item_with_hint,
+                android.R.id.text1,
+                options
+            ) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = super.getView(position, convertView, parent)
+                    val option = options[position]
+                    view.findViewById<TextView>(android.R.id.text1).text =
+                        formatFrequency(option.label, resources)
+                    val hint = formatFrequencyHint(option, weekdayNames)
+                    view.findViewById<TextView>(android.R.id.text2).apply {
+                        text = hint
+                        visibility = if (hint == null) View.GONE else View.VISIBLE
+                    }
+                    return view
                 }
+            }
+            val builder = AlertDialog.Builder(this)
+            builder.setAdapter(adapter) { dialog, which ->
+                val option = options[which]
+                freqNum = option.frequency.numerator
+                freqDen = option.frequency.denominator
+                targetPeriodMode = option.targetPeriodMode(stored = targetPeriodMode)
                 populateFrequency()
                 dialog.dismiss()
             }
             builder.show()
+        }
+
+        populateAssumeNone()
+        binding.assumeNoneRow.setOnClickListener { binding.assumeNoneSwitch.toggle() }
+        binding.assumeNoneSwitch.setOnCheckedChangeListener { _, isChecked ->
+            assumeNone = isChecked
+            populateAssumeNone()
+        }
+
+        binding.skipReminderIfLoggedCheckbox.setOnCheckedChangeListener { _, isChecked ->
+            skipReminderIfLogged = isChecked
         }
 
         populateReminder()
@@ -285,6 +334,9 @@ class EditHabitActivity : AppCompatActivity() {
             habit.targetValue = binding.targetInput.text.toString().toDouble()
             habit.targetType = targetType
             habit.unit = binding.unitInput.text.trim().toString()
+            habit.targetPeriodMode = targetPeriodMode
+            habit.assumeNone = assumeNone
+            habit.skipReminderIfLogged = skipReminderIfLogged
         }
         habit.type = habitType
 
@@ -332,17 +384,47 @@ class EditHabitActivity : AppCompatActivity() {
             binding.reminderDivider.visibility = View.VISIBLE
             binding.reminderDatePicker.text = reminderDays.toFormattedString(this)
         }
+        val showSkip = habitType == HabitType.NUMERICAL && reminderHour >= 0
+        val skipVisibility = if (showSkip) View.VISIBLE else View.GONE
+        binding.skipReminderIfLoggedDivider.visibility = skipVisibility
+        binding.skipReminderIfLoggedCheckbox.visibility = skipVisibility
+        binding.skipReminderIfLoggedCheckbox.isChecked = skipReminderIfLogged
+    }
+
+    private fun populateAssumeNone() {
+        val visibility = if (targetType == NumericalHabitType.AT_MOST) View.VISIBLE else View.GONE
+        binding.assumeNoneDivider.visibility = visibility
+        binding.assumeNoneRow.visibility = visibility
+        binding.assumeNoneSwitch.isChecked = assumeNone
+        binding.assumeNoneSubtitle.text = getString(
+            if (assumeNone) R.string.assume_none_on else R.string.assume_none_off
+        )
+    }
+
+    /** [weekdayNames] are the week's day names, starting on the first day of the week. */
+    private fun formatFrequencyHint(
+        option: MeasurableFrequencyOption,
+        weekdayNames: Array<String>
+    ): String? = when (option) {
+        MeasurableFrequencyOption.EVERY_DAY -> null
+        MeasurableFrequencyOption.EVERY_WEEK -> getString(
+            R.string.frequency_hint_calendar_week,
+            weekdayNames.first(),
+            weekdayNames.last()
+        )
+        MeasurableFrequencyOption.EVERY_7_DAYS -> getString(R.string.frequency_hint_rolling, 7)
+        MeasurableFrequencyOption.EVERY_MONTH -> getString(R.string.frequency_hint_calendar_month)
+        MeasurableFrequencyOption.EVERY_30_DAYS -> getString(R.string.frequency_hint_rolling, 30)
     }
 
     @SuppressLint("StringFormatMatches")
     private fun populateFrequency() {
-        binding.booleanFrequencyPicker.text = formatFrequency(freqNum, freqDen, resources)
-        binding.numericalFrequencyPicker.text = when (freqDen) {
-            1 -> getString(R.string.every_day)
-            7 -> getString(R.string.every_week)
-            30 -> getString(R.string.every_month)
-            else -> "$freqNum/$freqDen"
-        }
+        val frequency = Frequency(freqNum, freqDen)
+        binding.booleanFrequencyPicker.text = formatFrequency(FrequencyLabel.of(frequency), resources)
+        binding.numericalFrequencyPicker.text = formatFrequency(
+            FrequencyLabel.of(frequency, isNumerical = true, targetPeriodMode = targetPeriodMode),
+            resources
+        )
     }
 
     private fun populateTargetType() {
@@ -355,6 +437,14 @@ class EditHabitActivity : AppCompatActivity() {
     private fun updateColors() {
         androidColor = themeSwitcher.currentTheme.color(color).toInt()
         binding.colorButton.backgroundTintList = ColorStateList.valueOf(androidColor)
+        val offColor = StyledResources(this).getColor(R.attr.contrast60)
+        val checkedTint = ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+            intArrayOf(androidColor, offColor)
+        )
+        binding.assumeNoneSwitch.thumbTintList = checkedTint
+        binding.assumeNoneSwitch.trackTintList = checkedTint
+        CompoundButtonCompat.setButtonTintList(binding.skipReminderIfLoggedCheckbox, checkedTint)
         if (!themeSwitcher.isNightMode) {
             window.statusBarColor = androidColor
             binding.toolbar.setBackgroundColor(androidColor)
@@ -378,6 +468,10 @@ class EditHabitActivity : AppCompatActivity() {
             putInt("reminderHour", reminderHour)
             putInt("reminderMin", reminderMin)
             putInt("reminderDays", reminderDays.toInteger())
+            putInt("targetType", targetType.value)
+            putInt("targetPeriodMode", targetPeriodMode.value)
+            putBoolean("assumeNone", assumeNone)
+            putBoolean("skipReminderIfLogged", skipReminderIfLogged)
         }
     }
 }

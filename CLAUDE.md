@@ -72,6 +72,7 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
 - Load the `tdd` skill before writing the first test or line of code of an `/implement` run; the skill names `/tdd` only in passing, so it won't load unless you call it.
 - Run each slice red before green. A test written after its code has never been red: break the code it covers, watch the test fail, then restore the code. For `uhabits-core` tests, run this red check with `.claude/scripts/red-check.sh`.
 - A red counts only when the failing assertion is the behaviour under test. Read its message (`failure message=` in `uhabits-core/build/test-results/jvmTest/*.xml`); a setup assertion failing proves nothing. Example: `HabitList` orders habits by name, so in `ImportTest` `getByPosition` follows alphabetical order, not file order.
+- Hand checks of a screen run on the emulator; read `docs/agents/emulator.md` before the first `adb` call.
 
 ### Pull requests
 

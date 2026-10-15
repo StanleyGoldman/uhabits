@@ -21,6 +21,7 @@ package org.isoron.uhabits.core.models
 import org.isoron.platform.Synchronized
 import org.isoron.platform.time.LocalDate
 import org.isoron.uhabits.core.models.Score.Companion.compute
+import kotlin.math.max
 import kotlin.math.min
 
 class ScoreList {
@@ -61,9 +62,9 @@ class ScoreList {
     /**
      * Recomputes all scores between the provided [from] and [to] dates.
      *
-     * With [assumeNone] off, an "at most" habit starts at zero, and a day before [today] with
-     * nothing entered grades zero. Days from [today] on with nothing entered are still open,
-     * so they leave the score unchanged.
+     * With [assumeNone] off, an "at most" habit starts at zero, and a closed day (one before
+     * [today]) with nothing entered grades zero. Today and later days with nothing entered
+     * aren't closed yet, so they leave the score unchanged.
      */
     @Synchronized
     fun recompute(
@@ -88,7 +89,7 @@ class ScoreList {
         // manual check for boolean habits. Skips and unknown days add nothing.
         val points = entries.map {
             when {
-                isNumerical && it.state == Entry.AMOUNT -> it.amount!!.toLong()
+                isNumerical && it.state == Entry.AMOUNT -> max(0, it.amount!!).toLong()
                 !isNumerical && it.state == Entry.YES_MANUAL -> 1L
                 else -> 0L
             }
@@ -107,7 +108,7 @@ class ScoreList {
 
         var rollingSum = 0L
         var rollingSkips = 0
-        val isAtMostWithoutAssumeNone = isAtMost && !assumeNone
+        val isNothingEnteredMissed = isAtMost && !assumeNone
         var previousValue = if (isAtMost && assumeNone) 1.0 else 0.0
         for (i in entries.indices) {
             rollingSum += points[i]
@@ -122,7 +123,7 @@ class ScoreList {
             // don't take up slots in the window.
             val date = from.plus(i)
             val isNothingEntered = entries[i].state == Entry.UNKNOWN
-            if (isAtMostWithoutAssumeNone && isNothingEntered) {
+            if (isNothingEnteredMissed && isNothingEntered) {
                 if (date.isOlderThan(today)) previousValue = compute(freq, previousValue, 0.0)
             } else if (entries[i].state != Entry.SKIP) {
                 val daysThatCount = windowLength - rollingSkips

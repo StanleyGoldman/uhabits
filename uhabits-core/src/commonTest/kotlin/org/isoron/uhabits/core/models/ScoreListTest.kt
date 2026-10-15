@@ -587,6 +587,16 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
     }
 
     @Test
+    fun skipsShouldLowerTheCap() {
+        // "At most 2 per week" grades on 14 days against 4. With one skip in the window the
+        // cap scales to 4 × 13/14 ≈ 3.7, so 4 goes over it
+        habit.frequency = Frequency.WEEKLY
+        addEntries(1, 2, SKIP)
+        addEntries(0, 1, 4000)
+        assertTrue(habit.scores[today].value < 1.0)
+    }
+
+    @Test
     fun skipsShouldAddNothingToTheWindow() {
         // "At most 0 per week", nothing over the cap and one skipped day: the score
         // should stay at 100%

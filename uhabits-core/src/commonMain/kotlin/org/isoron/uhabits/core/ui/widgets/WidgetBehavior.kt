@@ -61,17 +61,28 @@ class WidgetBehavior(
     }
 
     fun onIncrement(habit: Habit, date: LocalDate, amount: Int) {
-        val entry = habit.computedEntries.get(date)
-        val currentValue = entry.value
-        setValue(habit, date, currentValue + amount, entry.notes)
+        if (!habit.isNumerical) return
+        val entry = habit.computedEntries.get(date).toStateForm(isNumerical = true)
+        val newAmount = (entry.amount ?: 0) + amount
+        setAmount(habit, date, newAmount, entry.notes)
         notificationTray.cancel(habit)
     }
 
     fun onDecrement(habit: Habit, date: LocalDate, amount: Int) {
-        val entry = habit.computedEntries.get(date)
-        val currentValue = entry.value
-        setValue(habit, date, currentValue - amount, entry.notes)
+        if (!habit.isNumerical) return
+        val entry = habit.computedEntries.get(date).toStateForm(isNumerical = true)
+        val currentAmount = entry.amount
+        if (currentAmount != null) {
+            val newAmount = maxOf(0, currentAmount - amount)
+            setAmount(habit, date, newAmount, entry.notes)
+        }
         notificationTray.cancel(habit)
+    }
+
+    private fun setAmount(habit: Habit, date: LocalDate, amount: Int, notes: String) {
+        commandRunner.run(
+            CreateRepetitionCommand(habitList, habit, date, Entry.AMOUNT, amount, notes)
+        )
     }
 
     fun setValue(habit: Habit, date: LocalDate, newValue: Int, notes: String) {

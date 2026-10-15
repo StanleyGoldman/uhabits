@@ -144,6 +144,38 @@ class HistoryCardStateTest : BaseUnitTest() {
         assertEquals(Square.DIMMED, squaresOf(h)(LocalDate(2015, 1, 18)))
     }
 
+    @Test
+    fun testAllSkippedWeek_hatched() {
+        val h = weeklyHabit(AT_LEAST, 10.0)
+        h.withAmountOn(LocalDate(2015, 1, 12), 10.0)
+        for (day in 18..24) h.withSkipOn(LocalDate(2015, 1, day))
+        assertEquals(Square.HATCHED, squaresOf(h)(LocalDate(2015, 1, 20)))
+    }
+
+    @Test
+    fun testAtMost_closedWeekUnderTheCap_emptyDaysDimmed() {
+        // A weekly period adds 0 for an empty day whatever assume none says.
+        for (assumeNone in listOf(true, false)) {
+            val h = weeklyHabit(AT_MOST, 4.0)
+            h.assumeNone = assumeNone
+            h.withAmountOn(LocalDate(2015, 1, 19), 3.0)
+            val squares = squaresOf(h)
+            assertEquals(Square.ON, squares(LocalDate(2015, 1, 19)), "assume none $assumeNone")
+            assertEquals(Square.DIMMED, squares(LocalDate(2015, 1, 20)), "assume none $assumeNone")
+        }
+    }
+
+    @Test
+    fun testClosedMonthStoredAsOneIn31_judgedAsTheCalendarMonth() {
+        val h = measurableHabit(Frequency(1, 31), AT_LEAST, 100.0)
+        h.withAmountOn(LocalDate(2014, 12, 1), 60.0)
+        h.withAmountOn(LocalDate(2014, 12, 31), 40.0)
+        val squares = squaresOf(h)
+        assertEquals(Square.ON, squares(LocalDate(2014, 12, 31)))
+        assertEquals(Square.DIMMED, squares(LocalDate(2014, 12, 15)))
+        assertEquals(Square.OFF_OUTLINED, squares(LocalDate(2015, 1, 1)), "January is open")
+    }
+
     private fun weeklyHabit(targetType: NumericalHabitType, target: Double) =
         measurableHabit(Frequency.WEEKLY, targetType, target)
 

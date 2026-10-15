@@ -157,9 +157,9 @@ class HistoryCardPresenter(
         ): HistoryCardState {
             val today = getToday()
             val oldestKnown = habit.computedEntries.getKnown().lastOrNull()?.date ?: today
-            // A calendar period is drawn whole, from the start of the oldest entry's period.
-            val isCalendar = habit.isJudgedByPeriod && habit.targetPeriodMode == CALENDAR
-            val oldest = if (isCalendar) habit.targetPeriod(oldestKnown)!!.start else oldestKnown
+            // A calendar week or month is drawn whole, from the start of the oldest entry's.
+            val drawsWholePeriods = habit.isJudgedByPeriod && habit.targetPeriodMode == CALENDAR
+            val oldest = if (drawsWholePeriods) habit.targetPeriod(oldestKnown)!!.start else oldestKnown
             val entries = habit.computedEntries.getByInterval(oldest, today)
             val series = if (habit.isJudgedByPeriod) {
                 entries.map { periodSquare(habit, it) }
@@ -203,7 +203,7 @@ class HistoryCardPresenter(
 
         /**
          * The square of a day of a weekly or monthly measurable habit, drawn
-         * from its period's verdict and what was entered on the day.
+         * from its period's status and what was entered on the day.
          */
         private fun periodSquare(habit: Habit, entry: Entry): HistoryChart.Square {
             val state = entry.toStateForm(isNumerical = true).state

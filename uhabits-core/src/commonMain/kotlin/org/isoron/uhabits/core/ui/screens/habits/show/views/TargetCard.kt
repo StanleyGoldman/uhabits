@@ -21,7 +21,6 @@ package org.isoron.uhabits.core.ui.screens.habits.show.views
 
 import org.isoron.platform.time.TruncateField
 import org.isoron.platform.time.getToday
-import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.PaletteColor
 import org.isoron.uhabits.core.models.TargetPeriodMode
@@ -30,7 +29,7 @@ import org.isoron.uhabits.core.models.groupedSum
 import org.isoron.uhabits.core.ui.views.Theme
 import kotlin.math.max
 
-/** The period a row of the Target card totals, which names the row. */
+/** The period a row of target progress totals, which names the row. */
 enum class TargetInterval {
     TODAY,
     WEEK,
@@ -173,18 +172,15 @@ class TargetCardPresenter {
             intervals.add(TargetInterval.YEAR)
 
             if (habit.isJudgedByPeriod && habit.targetPeriodMode == TargetPeriodMode.ROLLING) {
-                val row = if (denominator == 7) TargetInterval.WEEK else TargetInterval.MONTH
+                val (row, rollingRow) = when (denominator) {
+                    7 -> TargetInterval.WEEK to TargetInterval.LAST_7_DAYS
+                    else -> TargetInterval.MONTH to TargetInterval.LAST_30_DAYS
+                }
                 val index = intervals.indexOf(row)
-                val window = habit.targetPeriod(today)!!
-                val windowEntries = habit.computedEntries
-                    .getByInterval(window.start, window.endInclusive)
-                    .map { it.toStateForm(isNumerical = true) }
-                val days = window.start.daysUntil(window.endInclusive) + 1
-                val daysThatCount = days - windowEntries.count { it.state == Entry.SKIP }
-                intervals[index] =
-                    if (denominator == 7) TargetInterval.LAST_7_DAYS else TargetInterval.LAST_30_DAYS
-                values[index] = windowEntries.sumOf { it.amount ?: 0 } / 1e3
-                targets[index] = habit.targetValue * daysThatCount / days
+                val progress = habit.progressIn(habit.targetPeriod(today)!!)
+                intervals[index] = rollingRow
+                values[index] = progress.total
+                targets[index] = progress.target
             }
 
             return TargetCardState(

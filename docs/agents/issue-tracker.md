@@ -31,6 +31,10 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 Create a GitHub issue on StanleyGoldman/uhabits.
 
+## Spec tickets
+
+Used by `/to-tickets`. Publish each ticket as a **sub-issue of its spec issue**: `gh api --method POST repos/StanleyGoldman/uhabits/issues/<spec>/sub_issues -F sub_issue_id=<ticket-db-id>`, with the database id from `gh api repos/StanleyGoldman/uhabits/issues/<n> --jq .id`. Blocking edges between tickets use native issue dependencies, as under **Blocking** in Wayfinding operations below.
+
 ## When a skill says "fetch the relevant ticket"
 
 Run `gh issue view <number> --repo StanleyGoldman/uhabits --comments`.

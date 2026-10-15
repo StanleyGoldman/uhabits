@@ -18,7 +18,10 @@
  */
 package org.isoron.uhabits.core.models
 
+import org.isoron.platform.time.DayOfWeek
+import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.getToday
+import org.isoron.platform.time.setFirstWeekday
 import org.isoron.uhabits.core.BaseUnitTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -148,6 +151,35 @@ class HabitMatcherTest : BaseUnitTest() {
 
         val habits = listOf(untouched, no, belowTarget, underCap, overCap)
         assertEquals(habits, habits.filter(HabitMatcher(isCompletedAllowed = false)::matches))
+    }
+
+    @Test
+    fun testHideCompleted_followsThePeriodVerdict() {
+        // Today is Sunday 2015-01-25, the last day of a Monday-first week.
+        setFirstWeekday { DayOfWeek.MONDAY }
+        val weekMet = buildMeasurableHabit("Week met").weekly().withAmountOn(getToday().minus(3), 10000)
+        val weekOpen = buildMeasurableHabit("Week open").weekly().withAmountOn(getToday().minus(3), 4000)
+        val capOpen = buildMeasurableHabit("Cap open", NumericalHabitType.AT_MOST, 5.0)
+            .weekly().withAmountOn(getToday().minus(3), 5000)
+        val capOver = buildMeasurableHabit("Cap over", NumericalHabitType.AT_MOST, 5.0)
+            .weekly().withAmountOn(getToday().minus(3), 6000)
+
+        val habits = listOf(weekMet, weekOpen, capOpen, capOver)
+        assertEquals(
+            listOf(weekOpen, capOpen, capOver),
+            habits.filter(HabitMatcher(isCompletedAllowed = false)::matches)
+        )
+    }
+
+    private fun Habit.weekly(): Habit {
+        frequency = Frequency.WEEKLY
+        return this
+    }
+
+    private fun Habit.withAmountOn(date: LocalDate, amount: Int): Habit {
+        originalEntries.add(Entry(date, Entry.AMOUNT, amount))
+        recompute()
+        return this
     }
 
     private fun buildMeasurableHabit(

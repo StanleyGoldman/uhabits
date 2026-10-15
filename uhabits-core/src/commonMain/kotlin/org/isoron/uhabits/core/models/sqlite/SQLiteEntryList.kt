@@ -28,6 +28,12 @@ import org.isoron.uhabits.core.models.Frequency
 
 class SQLiteEntryList(val repository: EntryRepository) : EntryList() {
     var habitId: Long? = null
+
+    /**
+     * Whether the habit is measurable, read when an entry is written so an
+     * entry in the old single-value form is stored as state and amount.
+     */
+    var isNumerical: () -> Boolean = { false }
     var isLoaded = false
 
     private fun loadRecords() {
@@ -35,7 +41,7 @@ class SQLiteEntryList(val repository: EntryRepository) : EntryList() {
         val habitId = habitId ?: throw IllegalStateException("habitId must be set")
         val records = repository.findAllByHabitId(habitId)
         for (rec in records) {
-            super.add(Entry(LocalDate.fromUnixTime(rec.timestamp), rec.value, rec.notes))
+            super.add(Entry(LocalDate.fromUnixTime(rec.timestamp), rec.state, rec.amount, rec.notes))
         }
         isLoaded = true
     }
@@ -53,18 +59,20 @@ class SQLiteEntryList(val repository: EntryRepository) : EntryList() {
     override fun add(entry: Entry) {
         loadRecords()
         val habitId = habitId ?: throw IllegalStateException("habitId must be set")
+        val stored = entry.toStateForm(isNumerical())
 
-        repository.deleteByHabitIdAndTimestamp(habitId, entry.date.unixTime)
+        repository.deleteByHabitIdAndTimestamp(habitId, stored.date.unixTime)
 
         val data = EntryData(
             habitId = habitId,
-            timestamp = entry.date.unixTime,
-            value = entry.value,
-            notes = entry.notes
+            timestamp = stored.date.unixTime,
+            state = stored.state,
+            amount = stored.amount,
+            notes = stored.notes
         )
         repository.insert(data)
 
-        super.add(entry)
+        super.add(stored)
     }
 
     override fun getKnown(): List<Entry> {

@@ -28,6 +28,7 @@ import org.isoron.uhabits.core.models.HabitList
 import org.isoron.uhabits.core.models.HabitMatcher
 import org.isoron.uhabits.core.models.ModelObservable
 import org.isoron.uhabits.core.models.Reminder
+import org.isoron.uhabits.core.models.TargetPeriodMode
 import org.isoron.uhabits.core.models.WeekdayList
 import org.isoron.uhabits.core.test.HabitFixtures
 import kotlin.test.Test
@@ -111,6 +112,31 @@ class SQLiteHabitListTest : BaseUnitTest() {
         val all = repository.findAll()
         val record = all.find { it.id == habit.id }
         assertEquals(habit.name, record!!.name)
+    }
+
+    @Test
+    fun testJudgingSettingsDefaultForNewHabits() = dbTest {
+        val habit = modelFactory.buildHabit()
+        habitList.add(habit)
+        val record = repository.findAll().single { it.id == habit.id }
+        assertEquals(0, record.targetPeriodMode)
+        assertEquals(1, record.assumeNone)
+        assertEquals(0, record.skipReminderIfLogged)
+    }
+
+    @Test
+    fun testJudgingSettingsSurviveSaveAndReload() = dbTest {
+        val habit = habitList.getById(3)!!
+        habit.targetPeriodMode = TargetPeriodMode.ROLLING
+        habit.assumeNone = false
+        habit.skipReminderIfLogged = true
+        habitList.update(habit)
+
+        val reloaded = SQLiteHabitList(modelFactory).getById(3)!!
+        assertEquals(TargetPeriodMode.ROLLING, reloaded.targetPeriodMode)
+        assertEquals(false, reloaded.assumeNone)
+        assertEquals(true, reloaded.skipReminderIfLogged)
+        assertEquals(habit, reloaded)
     }
 
     @Test

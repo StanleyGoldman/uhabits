@@ -100,16 +100,16 @@ class LoopDBImporter(
             val entries = habit.originalEntries
 
             db.query(
-                "SELECT timestamp, value, notes FROM Repetitions WHERE habit = ? ORDER BY timestamp DESC",
+                "SELECT timestamp, state, amount, notes FROM Repetitions WHERE habit = ? ORDER BY timestamp DESC",
                 habitData.id.toString()
             ) { stmt ->
                 val timestamp = stmt.getLongOrNull(0) ?: return@query
-                val value = stmt.getIntOrNull(1) ?: return@query
-                val notes = stmt.getTextOrNull(2) ?: ""
-                val date = LocalDate.fromUnixTime(timestamp)
-                val (_, existingValue, existingNotes) = entries.get(date)
-                if (existingValue != value || existingNotes != notes) {
-                    entries.add(Entry(date, value, notes))
+                val state = stmt.getIntOrNull(1) ?: return@query
+                val amount = stmt.getIntOrNull(2)
+                val notes = stmt.getTextOrNull(3) ?: ""
+                val imported = Entry(LocalDate.fromUnixTime(timestamp), state, amount, notes)
+                if (entries.get(imported.date) != imported) {
+                    entries.add(imported)
                 }
             }
             habit.recompute()
@@ -123,7 +123,8 @@ class LoopDBImporter(
         db.query(
             "SELECT id, name, description, question, freq_num, freq_den, color, " +
                 "position, reminder_hour, reminder_min, reminder_days, highlight, " +
-                "archived, type, target_value, target_type, unit, uuid " +
+                "archived, type, target_value, target_type, unit, uuid, " +
+                "target_period_mode, assume_none, skip_reminder_if_logged " +
                 "FROM Habits ORDER BY position"
         ) { stmt ->
             result.add(
@@ -145,7 +146,10 @@ class LoopDBImporter(
                     targetValue = stmt.getRealOrNull(14) ?: 0.0,
                     targetType = stmt.getIntOrNull(15) ?: 0,
                     unit = stmt.getTextOrNull(16) ?: "",
-                    uuid = stmt.getTextOrNull(17)
+                    uuid = stmt.getTextOrNull(17),
+                    targetPeriodMode = stmt.getIntOrNull(18) ?: 0,
+                    assumeNone = stmt.getIntOrNull(19) ?: 1,
+                    skipReminderIfLogged = stmt.getIntOrNull(20) ?: 0
                 )
             )
         }

@@ -175,7 +175,10 @@ class HabitRepositoryTest {
             targetValue = 10.0,
             targetType = 1,
             unit = "minutes",
-            uuid = "550e8400-e29b-41d4-a716-446655440000"
+            uuid = "550e8400-e29b-41d4-a716-446655440000",
+            targetPeriodMode = 1,
+            assumeNone = 0,
+            skipReminderIfLogged = 1
         )
         original.id = repo.insert(original)
 
@@ -197,6 +200,9 @@ class HabitRepositoryTest {
         assertEquals(original.targetType, loaded.targetType)
         assertEquals(original.unit, loaded.unit)
         assertEquals(original.uuid, loaded.uuid)
+        assertEquals(original.targetPeriodMode, loaded.targetPeriodMode)
+        assertEquals(original.assumeNone, loaded.assumeNone)
+        assertEquals(original.skipReminderIfLogged, loaded.skipReminderIfLogged)
         assertNotNull(loaded.id)
         assertEquals(original.id, loaded.id)
 

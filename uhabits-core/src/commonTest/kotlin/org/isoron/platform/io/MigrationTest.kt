@@ -8,7 +8,7 @@ class MigrationTest {
     @Test
     fun testMigrateFromScratch() = runTest {
         val db = TestDatabaseHelper.createEmptyDatabase()
-        assertEquals(25, db.getVersion())
+        assertEquals(26, db.getVersion())
 
         db.run(
             """
@@ -18,7 +18,7 @@ class MigrationTest {
         )
         db.run(
             """
-            insert into Repetitions(habit, timestamp, value)
+            insert into Repetitions(habit, timestamp, state)
             values (1, 1000000, 2)
             """
         )

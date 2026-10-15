@@ -40,6 +40,8 @@ actual fun createTestDateFormatter(): LocalDateFormatter {
     return JsLocalDateFormatter("en-US")
 }
 
+actual suspend fun <T> withDefaultLocale(languageTag: String, block: suspend () -> T): T = block()
+
 private var fontsLoaded = false
 
 actual suspend fun ensureFontsLoaded() {

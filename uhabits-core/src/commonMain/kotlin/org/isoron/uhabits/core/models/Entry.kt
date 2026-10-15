@@ -19,6 +19,7 @@
 package org.isoron.uhabits.core.models
 
 import org.isoron.platform.time.LocalDate
+import kotlin.math.abs
 
 /**
  * What the user recorded on one day: a [state], an [amount] when the state is
@@ -61,17 +62,32 @@ data class Entry(
         }
     }
 
+    /**
+     * The entry as exported to CSV: the amount as a plain decimal (`2.5`,
+     * `5000`) when there is one, otherwise the state's label.
+     */
     val formattedValue: String
-        get() = when (value) {
+        get() = amount?.let { formatAmount(it) } ?: when (state) {
             YES_MANUAL -> "YES_MANUAL"
             YES_AUTO -> "YES_AUTO"
             NO -> "NO"
             SKIP -> "SKIP"
             UNKNOWN -> "UNKNOWN"
-            else -> value.toString()
+            else -> state.toString()
         }
 
     companion object {
+        /**
+         * Formats an amount stored ×1000 as a plain decimal with no trailing
+         * zeros. Integer arithmetic keeps the separator `.` in every locale.
+         */
+        private fun formatAmount(amount: Int): String {
+            val sign = if (amount < 0) "-" else ""
+            val whole = abs(amount / 1000)
+            val fraction = abs(amount % 1000).toString().padStart(3, '0').trimEnd('0')
+            return if (fraction.isEmpty()) "$sign$whole" else "$sign$whole.$fraction"
+        }
+
         /**
          * State of a measurable entry that records an amount.
          */

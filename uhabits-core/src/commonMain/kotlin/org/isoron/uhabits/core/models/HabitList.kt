@@ -178,7 +178,10 @@ abstract class HabitList : Iterable<Habit> {
             "Unit",
             "Target Type",
             "Target Value",
-            "Archived?"
+            "Archived?",
+            "Target Period",
+            "Assume None",
+            "Skip Reminder If Logged"
         )
         sb.append(csvLine(header))
         for (habit in this) {
@@ -195,11 +198,19 @@ abstract class HabitList : Iterable<Habit> {
                 if (habit.isNumerical) habit.unit else "",
                 if (habit.isNumerical) habit.targetType.name else "",
                 if (habit.isNumerical) format("%.1f", habit.targetValue) else "",
-                habit.isArchived.toString()
+                habit.isArchived.toString(),
+                if (habit.isNumerical) habit.targetPeriodMode.csvLabel() else "",
+                if (habit.isNumerical) habit.assumeNone.toString() else "",
+                if (habit.isNumerical) habit.skipReminderIfLogged.toString() else ""
             )
             sb.append(csvLine(cols))
         }
         return sb.toString()
+    }
+
+    private fun TargetPeriodMode.csvLabel() = when (this) {
+        TargetPeriodMode.CALENDAR -> "Calendar"
+        TargetPeriodMode.ROLLING -> "Rolling"
     }
 
     abstract fun resort()

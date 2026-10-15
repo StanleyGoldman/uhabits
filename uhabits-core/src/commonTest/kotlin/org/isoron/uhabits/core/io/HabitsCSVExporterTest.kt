@@ -20,8 +20,13 @@ package org.isoron.uhabits.core.io
 
 import kotlinx.coroutines.test.runTest
 import org.isoron.platform.io.ZipReader
+import org.isoron.platform.io.withDefaultLocale
+import org.isoron.platform.time.LocalDate
 import org.isoron.uhabits.core.BaseUnitTest
+import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
+import org.isoron.uhabits.core.models.NumericalHabitType
+import org.isoron.uhabits.core.models.TargetPeriodMode
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -63,5 +68,111 @@ class HabitsCSVExporterTest : BaseUnitTest() {
             val expected = fileOpener.openResourceFile("csv_export/$file").lines()
             assertEquals(expected, entry.content.trimEnd().lines(), "content mismatch for $file")
         }
+    }
+
+    @Test
+    fun testExportCSV_measurableCheckmarksArePlainAmounts() = runTest {
+        val habit = measurableHabitWithEntries()
+        val entries = ZipReader(HabitsCSVExporter(habitList, listOf(habit)).writeArchive()).entries()
+        val checkmarks = entries.first { it.name.endsWith(" Run/Checkmarks.csv") }
+        assertEquals(
+            listOf(
+                "Date,Value,Notes",
+                "2015-01-25,2.5,",
+                "2015-01-24,5000,",
+                "2015-01-23,0.003,",
+                "2015-01-22,SKIP,",
+                "2015-01-21,UNKNOWN,",
+                "2015-01-20,0,",
+                "2015-01-19,0.002,",
+                "2015-01-18,1,",
+                "2015-01-17,0.75,"
+            ),
+            checkmarks.content.trimEnd().lines()
+        )
+    }
+
+    @Test
+    fun testExportCSV_combinedCheckmarksShowMeasurableAmounts() = runTest {
+        val habit = measurableHabitWithEntries()
+        val entries = ZipReader(HabitsCSVExporter(habitList, listOf(habit)).writeArchive()).entries()
+        val checkmarks = entries.first { it.name == "Checkmarks.csv" }
+        assertEquals(
+            listOf(
+                "Date,Run,",
+                "2015-01-25,2.5,",
+                "2015-01-24,5000,",
+                "2015-01-23,0.003,",
+                "2015-01-22,SKIP,",
+                "2015-01-21,UNKNOWN,",
+                "2015-01-20,0,",
+                "2015-01-19,0.002,",
+                "2015-01-18,1,",
+                "2015-01-17,0.75,"
+            ),
+            checkmarks.content.trimEnd().lines()
+        )
+    }
+
+    @Test
+    fun testExportCSV_measurableAmountsUseDotInEveryLocale() = runTest {
+        val habit = measurableHabitWithEntries()
+        val bytes = withDefaultLocale("de-DE") {
+            HabitsCSVExporter(habitList, listOf(habit)).writeArchive()
+        }
+        val checkmarks = ZipReader(bytes).entries().first { it.name.endsWith(" Run/Checkmarks.csv") }
+        val lines = checkmarks.content.trimEnd().lines()
+        assertEquals("2015-01-25,2.5,", lines[1])
+        assertEquals("2015-01-17,0.75,", lines.last())
+    }
+
+    @Test
+    fun testExportCSV_habitsListTheJudgingSettings() = runTest {
+        val rolling = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_MOST)
+        rolling.targetPeriodMode = TargetPeriodMode.ROLLING
+        rolling.assumeNone = false
+        rolling.skipReminderIfLogged = true
+        habitList.add(rolling)
+        val calendar = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
+        habitList.add(calendar)
+        val entries = ZipReader(HabitsCSVExporter(habitList, emptyList()).writeArchive()).entries()
+        val lines = entries.first { it.name == "Habits.csv" }.content.trimEnd().lines()
+        assertEquals(
+            "Position,Name,Type,Question,Description,FrequencyNumerator,FrequencyDenominator," +
+                "Color,Unit,Target Type,Target Value,Archived?," +
+                "Target Period,Assume None,Skip Reminder If Logged",
+            lines[0]
+        )
+        val settingsByName = lines.drop(1).map { line ->
+            val cols = line.split(",")
+            cols[1] + " " + cols[9] to cols.takeLast(3)
+        }.toMap()
+        assertEquals(listOf("Rolling", "false", "true"), settingsByName.getValue("Run AT_MOST"))
+        assertEquals(listOf("Calendar", "true", "false"), settingsByName.getValue("Run AT_LEAST"))
+        assertEquals(listOf("", "", ""), settingsByName.getValue("Meditate "))
+    }
+
+    /**
+     * A measurable habit whose entries include amounts that the old export
+     * mistook for yes-or-no labels: 0.003, 0, 0.002 and 1.
+     */
+    private fun measurableHabitWithEntries(): Habit {
+        val habit = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
+        habitList.add(habit)
+        val entries = listOf(
+            Entry(LocalDate(2015, 1, 25), Entry.AMOUNT, 2500),
+            Entry(LocalDate(2015, 1, 24), Entry.AMOUNT, 5_000_000),
+            Entry(LocalDate(2015, 1, 23), Entry.AMOUNT, 3),
+            Entry(LocalDate(2015, 1, 22), Entry.SKIP, null),
+            Entry(LocalDate(2015, 1, 21), Entry.UNKNOWN, null),
+            Entry(LocalDate(2015, 1, 20), Entry.AMOUNT, 0),
+            Entry(LocalDate(2015, 1, 19), Entry.AMOUNT, 2),
+            Entry(LocalDate(2015, 1, 18), Entry.AMOUNT, 1000),
+            // Old single-value form, which the in-memory entry list keeps as is
+            Entry(LocalDate(2015, 1, 17), 750)
+        )
+        for (e in entries) habit.originalEntries.add(e)
+        habit.recompute()
+        return habit
     }
 }

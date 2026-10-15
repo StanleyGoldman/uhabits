@@ -23,7 +23,6 @@ import org.isoron.platform.io.csvLine
 import org.isoron.platform.io.format
 import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.getToday
-import org.isoron.uhabits.core.models.EntryList
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitList
 import kotlin.math.min
@@ -43,7 +42,7 @@ class HabitsCSVExporter(
         for (h in selectedHabits) {
             val habitDirName = habitDirName(h)
             zip.addEntry("${habitDirName}Scores.csv", writeScores(h))
-            zip.addEntry("${habitDirName}Checkmarks.csv", writeEntries(h.computedEntries))
+            zip.addEntry("${habitDirName}Checkmarks.csv", writeEntries(h))
         }
         zip.addEntry("Scores.csv", writeMultipleHabitsScores())
         zip.addEntry("Checkmarks.csv", writeMultipleHabitsCheckmarks())
@@ -73,11 +72,12 @@ class HabitsCSVExporter(
         return sb.toString()
     }
 
-    private fun writeEntries(entries: EntryList): String {
+    private fun writeEntries(habit: Habit): String {
         val sb = StringBuilder()
         sb.append(csvLine(arrayOf("Date", "Value", "Notes")))
-        for (entry in entries.getKnown()) {
-            sb.append(csvLine(arrayOf(entry.date.toCSVString(), entry.formattedValue, entry.notes)))
+        for (entry in habit.computedEntries.getKnown()) {
+            val value = entry.toStateForm(habit.isNumerical).formattedValue
+            sb.append(csvLine(arrayOf(entry.date.toCSVString(), value, entry.notes)))
         }
         return sb.toString()
     }
@@ -114,7 +114,8 @@ class HabitsCSVExporter(
             val date = newest.minus(i).toCSVString()
             sb.append(date).append(delimiter)
             for (j in selectedHabits.indices) {
-                sb.append(checkmarks[j][i].formattedValue).append(delimiter)
+                val entry = checkmarks[j][i].toStateForm(selectedHabits[j].isNumerical)
+                sb.append(entry.formattedValue).append(delimiter)
             }
             sb.append("\n")
         }

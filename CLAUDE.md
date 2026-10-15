@@ -60,10 +60,6 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
   - one JSON result line on stdout, built with `jq -n` (installed) and read back with `jq`;
   - a `next` field naming the follow-up whenever the script can't finish.
 
-### Shell
-
-- The Bash tool runs zsh. Single-quote every glob argument (`grep --include='*.kt'`) and any word starting with `=` (`echo '---'` as a separator): zsh expands both before the command sees them and aborts with `no matches found` or `== not found`.
-
 ### Worktrees
 
 - The main checkout in the repo folder belongs to the user; keep its branch as the user left it.

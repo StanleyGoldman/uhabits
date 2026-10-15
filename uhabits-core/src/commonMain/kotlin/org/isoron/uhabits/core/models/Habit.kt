@@ -81,6 +81,13 @@ data class Habit(
         return periodStatus(period)
     }
 
+    /**
+     * True for a weekly or monthly measurable habit, whose days are judged
+     * by their target period rather than one by one.
+     */
+    val isJudgedByPeriod: Boolean
+        get() = isNumerical && targetPeriod(getToday()) != null
+
     private fun yesOrNoStatus(date: LocalDate): DayStatus {
         return when (computedEntries.get(date).value) {
             Entry.UNKNOWN -> if (date < getToday()) DayStatus.MISSED else DayStatus.OPEN
@@ -154,7 +161,7 @@ data class Habit(
      * 30 days ending on it, or null for a daily habit. A rolling month is
      * 30 days however the frequency is stored.
      */
-    private fun targetPeriod(date: LocalDate): ClosedRange<LocalDate>? {
+    fun targetPeriod(date: LocalDate): ClosedRange<LocalDate>? {
         val isRolling = targetPeriodMode == TargetPeriodMode.ROLLING
         return when (periodUnit) {
             PeriodUnit.WEEK -> when {
@@ -191,8 +198,7 @@ data class Habit(
      * rounds.
      */
     private fun periodStatus(period: ClosedRange<LocalDate>): DayStatus? {
-        val entries = computedEntries.getByInterval(period.start, period.endInclusive)
-            .map { it.toStateForm(isNumerical = true) }
+        val entries = periodEntries(period)
         val days = period.start.daysUntil(period.endInclusive) + 1L
         val daysThatCount = days - entries.count { it.state == Entry.SKIP }
         if (daysThatCount == 0L) return null
@@ -204,6 +210,31 @@ data class Habit(
             isEntered = amounts.isNotEmpty()
         )
     }
+
+    /**
+     * True on the day an "at most" calendar period's total first went over
+     * its cap, scaled for skips as the period's verdict scales it. Rolling
+     * windows have no such day: each day is judged by a window of its own.
+     */
+    fun wentOverCapOn(date: LocalDate): Boolean {
+        if (!isNumerical || targetType != NumericalHabitType.AT_MOST) return false
+        if (targetPeriodMode == TargetPeriodMode.ROLLING) return false
+        val period = targetPeriod(date) ?: return false
+        val entries = periodEntries(period).reversed()
+        val days = period.start.daysUntil(period.endInclusive) + 1L
+        val cap = targetX1000() * (days - entries.count { it.state == Entry.SKIP })
+        var total = 0L
+        for (entry in entries) {
+            if (entry.state == Entry.AMOUNT) total += entry.amount!!
+            if (total * days > cap) return entry.date == date
+        }
+        return false
+    }
+
+    /** The period's entries in state form, newest first. */
+    private fun periodEntries(period: ClosedRange<LocalDate>): List<Entry> =
+        computedEntries.getByInterval(period.start, period.endInclusive)
+            .map { it.toStateForm(isNumerical = true) }
 
     fun isEnteredToday(): Boolean {
         val today = getToday()

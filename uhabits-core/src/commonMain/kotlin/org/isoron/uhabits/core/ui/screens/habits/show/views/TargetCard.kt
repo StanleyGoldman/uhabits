@@ -21,18 +21,35 @@ package org.isoron.uhabits.core.ui.screens.habits.show.views
 
 import org.isoron.platform.time.TruncateField
 import org.isoron.platform.time.getToday
+import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.PaletteColor
+import org.isoron.uhabits.core.models.TargetPeriodMode
 import org.isoron.uhabits.core.models.countSkippedDays
 import org.isoron.uhabits.core.models.groupedSum
 import org.isoron.uhabits.core.ui.views.Theme
 import kotlin.math.max
 
+/** The period a row of the Target card totals, which names the row. */
+enum class TargetInterval {
+    TODAY,
+    WEEK,
+
+    /** The rolling window of a habit with an "Every 7 days" target. */
+    LAST_7_DAYS,
+    MONTH,
+
+    /** The rolling window of a habit with an "Every 30 days" target. */
+    LAST_30_DAYS,
+    QUARTER,
+    YEAR
+}
+
 data class TargetCardState(
     val color: PaletteColor,
     val values: List<Double> = listOf(),
     val targets: List<Double> = listOf(),
-    val intervals: List<Int> = listOf(),
+    val intervals: List<TargetInterval> = listOf(),
     val theme: Theme
 )
 
@@ -148,12 +165,27 @@ class TargetCardPresenter {
             targets.add(targetThisQuarter)
             targets.add(targetThisYear)
 
-            val intervals = mutableListOf<Int>()
-            if (habit.frequency.denominator <= 1) intervals.add(1)
-            if (habit.frequency.denominator <= 7) intervals.add(7)
-            intervals.add(30)
-            intervals.add(91)
-            intervals.add(365)
+            val intervals = mutableListOf<TargetInterval>()
+            if (habit.frequency.denominator <= 1) intervals.add(TargetInterval.TODAY)
+            if (habit.frequency.denominator <= 7) intervals.add(TargetInterval.WEEK)
+            intervals.add(TargetInterval.MONTH)
+            intervals.add(TargetInterval.QUARTER)
+            intervals.add(TargetInterval.YEAR)
+
+            if (habit.isJudgedByPeriod && habit.targetPeriodMode == TargetPeriodMode.ROLLING) {
+                val row = if (denominator == 7) TargetInterval.WEEK else TargetInterval.MONTH
+                val index = intervals.indexOf(row)
+                val window = habit.targetPeriod(today)!!
+                val windowEntries = habit.computedEntries
+                    .getByInterval(window.start, window.endInclusive)
+                    .map { it.toStateForm(isNumerical = true) }
+                val days = window.start.daysUntil(window.endInclusive) + 1
+                val daysThatCount = days - windowEntries.count { it.state == Entry.SKIP }
+                intervals[index] =
+                    if (denominator == 7) TargetInterval.LAST_7_DAYS else TargetInterval.LAST_30_DAYS
+                values[index] = windowEntries.sumOf { it.amount ?: 0 } / 1e3
+                targets[index] = habit.targetValue * daysThatCount / days
+            }
 
             return TargetCardState(
                 color = habit.color,

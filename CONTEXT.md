@@ -133,7 +133,7 @@ The user's chosen start of the week, used to lay out the calendar, group days in
 A yes-or-no habit's summary card: its current score, how that changed over the past month and year, and its total manual yeses.
 
 **Calendar**:
-The grid of a habit's daily entries on its screen. The widget showing the same grid is named "History".
+The grid of a habit's daily entries on its screen. The widget showing the same grid is named "History". For a weekly or monthly measurable habit each day is drawn by its target period's status: days of a met period are full colour if entered and dimmed if not; days of a missed period are grey if entered and empty if not; days of the open period are outlined in the habit colour. A red corner marks the day an "at most" calendar period went over its cap.
 _Avoid_: History, heatmap
 
 **Bar chart**:
@@ -144,7 +144,7 @@ _Avoid_: Repetitions chart, History
 How often a habit was done on each weekday, month by month; not the habit's frequency setting.
 
 **Target progress**:
-A measurable habit's amount so far in the current day, week, month, quarter and year, each against the target scaled to that period.
+A measurable habit's amount so far in the current day, week, month, quarter and year, each against the target scaled to that period. In rolling mode the week or month row is the last 7 or 30 days instead.
 
 ### Reminders
 

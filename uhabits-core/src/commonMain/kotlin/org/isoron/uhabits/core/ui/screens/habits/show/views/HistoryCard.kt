@@ -24,6 +24,7 @@ import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.commands.CommandRunner
 import org.isoron.uhabits.core.commands.CreateRepetitionCommand
+import org.isoron.uhabits.core.models.DayStatus
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Entry.Companion.SKIP
 import org.isoron.uhabits.core.models.Entry.Companion.YES_AUTO
@@ -33,15 +34,20 @@ import org.isoron.uhabits.core.models.HabitList
 import org.isoron.uhabits.core.models.NumericalHabitType.AT_LEAST
 import org.isoron.uhabits.core.models.NumericalHabitType.AT_MOST
 import org.isoron.uhabits.core.models.PaletteColor
+import org.isoron.uhabits.core.models.TargetPeriodMode.CALENDAR
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.ui.NumberField
 import org.isoron.uhabits.core.ui.callbacks.CheckMarkDialogCallback
 import org.isoron.uhabits.core.ui.callbacks.NumberPickerCallback
 import org.isoron.uhabits.core.ui.views.HistoryChart
 import org.isoron.uhabits.core.ui.views.HistoryChart.Square.DIMMED
+import org.isoron.uhabits.core.ui.views.HistoryChart.Square.DIMMED_OUTLINED
 import org.isoron.uhabits.core.ui.views.HistoryChart.Square.GREY
+import org.isoron.uhabits.core.ui.views.HistoryChart.Square.GREY_HATCHED
+import org.isoron.uhabits.core.ui.views.HistoryChart.Square.GREY_OVER_CAP
 import org.isoron.uhabits.core.ui.views.HistoryChart.Square.HATCHED
 import org.isoron.uhabits.core.ui.views.HistoryChart.Square.OFF
+import org.isoron.uhabits.core.ui.views.HistoryChart.Square.OFF_OUTLINED
 import org.isoron.uhabits.core.ui.views.HistoryChart.Square.ON
 import org.isoron.uhabits.core.ui.views.OnDateClickedListener
 import org.isoron.uhabits.core.ui.views.Theme
@@ -150,9 +156,14 @@ class HistoryCardPresenter(
             theme: Theme
         ): HistoryCardState {
             val today = getToday()
-            val oldest = habit.computedEntries.getKnown().lastOrNull()?.date ?: today
+            val oldestKnown = habit.computedEntries.getKnown().lastOrNull()?.date ?: today
+            // A calendar period is drawn whole, from the start of the oldest entry's period.
+            val isCalendar = habit.isJudgedByPeriod && habit.targetPeriodMode == CALENDAR
+            val oldest = if (isCalendar) habit.targetPeriod(oldestKnown)!!.start else oldestKnown
             val entries = habit.computedEntries.getByInterval(oldest, today)
-            val series = if (habit.isNumerical) {
+            val series = if (habit.isJudgedByPeriod) {
+                entries.map { periodSquare(habit, it) }
+            } else if (habit.isNumerical) {
                 entries.map {
                     when {
                         it.value == Entry.UNKNOWN -> OFF
@@ -188,6 +199,25 @@ class HistoryCardPresenter(
                 defaultSquare = OFF,
                 notesIndicators = notesIndicators
             )
+        }
+
+        /**
+         * The square of a day of a weekly or monthly measurable habit, drawn
+         * from its period's verdict and what was entered on the day.
+         */
+        private fun periodSquare(habit: Habit, entry: Entry): HistoryChart.Square {
+            val state = entry.toStateForm(isNumerical = true).state
+            val status = habit.statusOn(entry.date)
+            if (state == Entry.SKIP) return if (status == DayStatus.MISSED) GREY_HATCHED else HATCHED
+            return when (status) {
+                DayStatus.MET -> if (state == Entry.AMOUNT) ON else DIMMED
+                DayStatus.OPEN -> if (state == Entry.AMOUNT) DIMMED_OUTLINED else OFF_OUTLINED
+                else -> when {
+                    state != Entry.AMOUNT -> OFF
+                    habit.wentOverCapOn(entry.date) -> GREY_OVER_CAP
+                    else -> GREY
+                }
+            }
         }
     }
 

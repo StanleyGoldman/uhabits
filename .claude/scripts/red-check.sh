@@ -11,7 +11,11 @@
 #     --old-file <path> --new-file <path>
 #
 #   --file      source file to mutate, relative to the repo root or absolute
-#   --tests     test class name or pattern; runs `--tests '*<TestClass>'`
+#   --tests     test class name or pattern; runs `--tests '*<TestClass>'`.
+#               The match is on the class name's suffix, and one test file
+#               can hold several classes: ScoreListTest.kt also holds
+#               NumericalAtLeastScoreListWithSkipTest, which `ScoreListTest`
+#               misses. Cover a whole file with a prefix (`ScoreList*`).
 #   --old-file  file holding the exact text to replace
 #   --new-file  file holding the replacement text (may be empty)
 #

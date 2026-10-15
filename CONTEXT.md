@@ -57,10 +57,16 @@ The free-text label for a measurable habit's amounts (e.g. "miles", "pages").
 **Target period**:
 A measurable habit's frequency read as the period its target covers: per day, per week or per month.
 
+**Target period mode**:
+How a weekly or monthly measurable habit lays out its target period: calendar weeks and months ("Every week"), or a rolling window of the last 7 or 30 days ("Every 7 days").
+
+**Assume none**:
+Per-habit setting on an "at most" habit: whether a closed day with nothing entered counts as met (on) or missed (off).
+
 ### Entries
 
 **Entry**:
-The record of one habit on one day: a value and optional entry notes.
+The record of one habit on one day: a state (yes, no, skip, unknown, or amount), the amount when the state is amount, and optional entry notes.
 _Avoid_: Checkmark (except as the UI word for a yes-or-no entry), repetition, check, record
 
 **Entry notes**:

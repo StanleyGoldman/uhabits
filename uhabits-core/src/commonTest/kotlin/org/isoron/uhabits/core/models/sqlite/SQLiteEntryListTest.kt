@@ -24,7 +24,11 @@ import org.isoron.platform.time.LocalDate
 import org.isoron.uhabits.core.BaseUnitTest.Companion.buildMemoryDatabase
 import org.isoron.uhabits.core.database.EntryData
 import org.isoron.uhabits.core.models.Entry
+import org.isoron.uhabits.core.models.Entry.Companion.AMOUNT
+import org.isoron.uhabits.core.models.Entry.Companion.SKIP
 import org.isoron.uhabits.core.models.Entry.Companion.UNKNOWN
+import org.isoron.uhabits.core.models.Entry.Companion.YES_MANUAL
+import org.isoron.uhabits.core.models.HabitType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -32,6 +36,7 @@ class SQLiteEntryListTest {
 
     private lateinit var factory: SQLModelFactory
     private lateinit var entries: SQLiteEntryList
+    private lateinit var yesNoEntries: SQLiteEntryList
     private val today = LocalDate(2015, 1, 25)
 
     private suspend fun initTest() {
@@ -39,8 +44,17 @@ class SQLiteEntryListTest {
         factory = SQLModelFactory(database)
         val habitList = factory.buildHabitList()
         val habit = factory.buildHabit()
+        habit.type = HabitType.NUMERICAL
         habitList.add(habit)
         entries = habit.originalEntries as SQLiteEntryList
+        val yesNoHabit = factory.buildHabit()
+        habitList.add(yesNoHabit)
+        yesNoEntries = yesNoHabit.originalEntries as SQLiteEntryList
+    }
+
+    private fun reloadEntries(habitId: Long): SQLiteEntryList {
+        val habit = factory.buildHabitList().getById(habitId)!!
+        return habit.originalEntries as SQLiteEntryList
     }
 
     @Test
@@ -51,18 +65,20 @@ class SQLiteEntryListTest {
             EntryData(
                 habitId = entries.habitId,
                 timestamp = today.unixTime,
-                value = 500
+                state = AMOUNT,
+                amount = 500
             )
         )
         factory.entryRepository.insert(
             EntryData(
                 habitId = entries.habitId,
                 timestamp = today.minus(5).unixTime,
-                value = 300
+                state = SKIP,
+                notes = "away"
             )
         )
         assertEquals(
-            Entry(date = today, value = 500),
+            Entry(today, AMOUNT, 500),
             entries.get(today)
         )
         assertEquals(
@@ -70,7 +86,7 @@ class SQLiteEntryListTest {
             entries.get(today.minus(1))
         )
         assertEquals(
-            Entry(date = today.minus(5), value = 300),
+            Entry(today.minus(5), SKIP, null, "away"),
             entries.get(today.minus(5))
         )
     }
@@ -79,11 +95,11 @@ class SQLiteEntryListTest {
     fun testLoadEntryAtUnixEpoch() = runTest {
         initTest()
         factory.entryRepository.insert(
-            EntryData(habitId = entries.habitId, timestamp = 0, value = 2)
+            EntryData(habitId = yesNoEntries.habitId, timestamp = 0, state = 2)
         )
         assertEquals(
             listOf(Entry(date = LocalDate(1970, 1, 1), value = 2)),
-            entries.getKnown()
+            yesNoEntries.getKnown()
         )
     }
 
@@ -94,19 +110,76 @@ class SQLiteEntryListTest {
 
         assertEquals(0, factory.entryRepository.findAllByHabitId(habitId).size)
 
-        val original = Entry(today, 150)
+        val original = Entry(today, AMOUNT, 150)
         entries.add(original)
 
         val all = factory.entryRepository.findAllByHabitId(habitId)
         assertEquals(1, all.size)
-        assertEquals(150, all[0].value)
+        assertEquals(AMOUNT, all[0].state)
+        assertEquals(150, all[0].amount)
         assertEquals(today.unixTime, all[0].timestamp)
 
-        val replacement = Entry(today, 90)
+        val replacement = Entry(today, AMOUNT, 90)
         entries.add(replacement)
 
         val all2 = factory.entryRepository.findAllByHabitId(habitId)
         assertEquals(1, all2.size)
-        assertEquals(90, all2[0].value)
+        assertEquals(90, all2[0].amount)
+    }
+
+    @Test
+    fun testStateAndAmountSurviveReload() = runTest {
+        initTest()
+        entries.add(Entry(today, AMOUNT, 2500, "two and a half"))
+        entries.add(Entry(today.minus(1), SKIP, null, "sick"))
+        entries.add(Entry(today.minus(2), AMOUNT, 0))
+        yesNoEntries.add(Entry(today, YES_MANUAL, null, "done"))
+
+        val reloaded = reloadEntries(entries.habitId!!)
+        assertEquals(Entry(today, AMOUNT, 2500, "two and a half"), reloaded.get(today))
+        assertEquals(Entry(today.minus(1), SKIP, null, "sick"), reloaded.get(today.minus(1)))
+        assertEquals(Entry(today.minus(2), AMOUNT, 0), reloaded.get(today.minus(2)))
+        val reloadedYesNo = reloadEntries(yesNoEntries.habitId!!)
+        assertEquals(Entry(today, YES_MANUAL, null, "done"), reloadedYesNo.get(today))
+    }
+
+    @Test
+    fun testAddOldFormMeasurableEntryStoresStateAndAmount() = runTest {
+        initTest()
+        entries.add(Entry(today, 2500, "notes"))
+        entries.add(Entry(today.minus(1), SKIP))
+        entries.add(Entry(today.minus(2), UNKNOWN, "only notes"))
+        entries.add(Entry(today.minus(3), YES_MANUAL))
+        entries.add(Entry(today.minus(4), 0))
+
+        val expected = listOf(
+            Entry(today, AMOUNT, 2500, "notes"),
+            Entry(today.minus(1), SKIP, null),
+            Entry(today.minus(2), UNKNOWN, null, "only notes"),
+            Entry(today.minus(3), AMOUNT, 1000),
+            Entry(today.minus(4), AMOUNT, 0)
+        )
+        val reloaded = reloadEntries(entries.habitId!!)
+        for (entry in expected) {
+            assertEquals(entry, entries.get(entry.date))
+            assertEquals(entry, reloaded.get(entry.date))
+        }
+    }
+
+    @Test
+    fun testAddOldFormMeasurableEntryKeepsValueForReaders() = runTest {
+        initTest()
+        entries.add(Entry(today, 2500))
+        entries.add(Entry(today.minus(1), SKIP))
+        assertEquals(2500, entries.get(today).value)
+        assertEquals(SKIP, entries.get(today.minus(1)).value)
+    }
+
+    @Test
+    fun testAddYesNoEntryStoresValueAsState() = runTest {
+        initTest()
+        yesNoEntries.add(Entry(today, YES_MANUAL))
+        val reloaded = reloadEntries(yesNoEntries.habitId!!)
+        assertEquals(Entry(today, YES_MANUAL, null), reloaded.get(today))
     }
 }

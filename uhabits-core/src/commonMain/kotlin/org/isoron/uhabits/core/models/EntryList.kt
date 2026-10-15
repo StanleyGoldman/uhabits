@@ -305,7 +305,9 @@ fun List<Entry>.groupedSum(
     isNumerical: Boolean
 ): List<Entry> {
     val firstWeekdayEnum = DayOfWeek.values()[firstWeekday - 1]
-    return this.map { (date, value) ->
+    return this.map { entry ->
+        val date = entry.date
+        val value = entry.value
         if (isNumerical) {
             if (value == SKIP) {
                 Entry(date, 0)
@@ -332,8 +334,9 @@ fun List<Entry>.countSkippedDays(
     firstWeekday: Int = 7
 ): List<Entry> {
     val firstWeekdayEnum = DayOfWeek.values()[firstWeekday - 1]
-    return this.map { (date, value) ->
-        if (value == SKIP) {
+    return this.map { entry ->
+        val date = entry.date
+        if (entry.value == SKIP) {
             Entry(date, 1)
         } else {
             Entry(date, 0)

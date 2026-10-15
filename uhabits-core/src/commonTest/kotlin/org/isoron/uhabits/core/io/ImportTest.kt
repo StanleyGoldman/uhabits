@@ -25,6 +25,7 @@ import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Frequency
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitType
+import org.isoron.uhabits.core.models.TargetPeriodMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -108,6 +109,38 @@ class ImportTest : BaseUnitTest() {
         assertTrue(isChecked(habit, 2016, 3, 14))
         assertTrue(isChecked(habit, 2016, 3, 16))
         assertFalse(isChecked(habit, 2016, 3, 17))
+    }
+
+    @Test
+    fun testLoopDBVersion25UpgradesEntriesAndHabits() = runTest {
+        importFromFile("loop_v25.db")
+        assertEquals(10, habitList.size())
+        val run = habitList.getByUUID("feedface000000000000000000000001")!!
+        assertTrue(run.isNumerical)
+        assertEquals(TargetPeriodMode.CALENDAR, run.targetPeriodMode)
+        assertTrue(run.assumeNone)
+        assertFalse(run.skipReminderIfLogged)
+
+        fun entry(day: Int) = run.originalEntries.get(LocalDate(2021, 1, day))
+        assertEquals(Entry(LocalDate(2021, 1, 1), Entry.AMOUNT, 2500, "morning"), entry(1))
+        assertEquals(Entry(LocalDate(2021, 1, 2), Entry.SKIP, null, "sick"), entry(2))
+        assertEquals(Entry(LocalDate(2021, 1, 3), Entry.UNKNOWN, null, "forgot"), entry(3))
+        assertEquals(Entry(LocalDate(2021, 1, 4), Entry.AMOUNT, 1000), entry(4))
+        assertEquals(Entry(LocalDate(2021, 1, 5), Entry.AMOUNT, 0), entry(5))
+
+        val wakeUp = habitList.getByPosition(0)
+        assertEquals("Wake up early", wakeUp.name)
+        assertTrue(isChecked(wakeUp, 2016, 3, 14))
+        assertFalse(isChecked(wakeUp, 2016, 3, 17))
+    }
+
+    @Test
+    fun testLoopDBVersion26KeepsJudgingSettings() = runTest {
+        importFromFile("loop_v26.db")
+        val run = habitList.getByUUID("feedface000000000000000000000001")!!
+        assertEquals(TargetPeriodMode.ROLLING, run.targetPeriodMode)
+        assertFalse(run.assumeNone)
+        assertTrue(run.skipReminderIfLogged)
     }
 
     @Test

@@ -9,20 +9,21 @@ data class EntryData(
     var id: Long? = null,
     var habitId: Long? = null,
     var timestamp: Long = 0,
-    var value: Int = 0,
+    var state: Int = 0,
+    var amount: Int? = null,
     var notes: String = ""
 )
 
 class EntryRepository(private val db: Database) {
     private val findAllByHabitStmt by lazy {
         db.prepareStatement(
-            "SELECT id, habit, timestamp, value, notes FROM Repetitions WHERE habit = ? ORDER BY timestamp DESC"
+            "SELECT id, habit, timestamp, state, amount, notes FROM Repetitions WHERE habit = ? ORDER BY timestamp DESC"
         )
     }
 
     private val insertStmt by lazy {
         db.prepareStatement(
-            "INSERT INTO Repetitions(habit, timestamp, value, notes) VALUES (?, ?, ?, ?)"
+            "INSERT INTO Repetitions(habit, timestamp, state, amount, notes) VALUES (?, ?, ?, ?, ?)"
         )
     }
 
@@ -44,8 +45,9 @@ class EntryRepository(private val db: Database) {
                     id = findAllByHabitStmt.getLong(0),
                     habitId = findAllByHabitStmt.getLong(1),
                     timestamp = findAllByHabitStmt.getLong(2),
-                    value = findAllByHabitStmt.getInt(3),
-                    notes = findAllByHabitStmt.getTextOrNull(4) ?: ""
+                    state = findAllByHabitStmt.getInt(3),
+                    amount = findAllByHabitStmt.getIntOrNull(4),
+                    notes = findAllByHabitStmt.getTextOrNull(5) ?: ""
                 )
             )
         }
@@ -56,8 +58,9 @@ class EntryRepository(private val db: Database) {
         insertStmt.reset()
         insertStmt.bindLong(1, data.habitId!!)
         insertStmt.bindLong(2, data.timestamp)
-        insertStmt.bindInt(3, data.value)
-        insertStmt.bindText(4, data.notes)
+        insertStmt.bindInt(3, data.state)
+        if (data.amount != null) insertStmt.bindInt(4, data.amount!!) else insertStmt.bindNull(4)
+        insertStmt.bindText(5, data.notes)
         insertStmt.step()
         return db.queryLong("SELECT last_insert_rowid()")
     }

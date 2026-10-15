@@ -307,9 +307,9 @@ class HabitCardListCache(
                 newData.scores[habit.id] = habit.scores[today].value
                 val checkmarkList = mutableListOf<Int>()
                 val noteList = mutableListOf<String>()
-                for ((_, value, note) in habit.computedEntries.getByInterval(dateFrom, today)) {
-                    checkmarkList.add(value)
-                    noteList.add(note)
+                for (entry in habit.computedEntries.getByInterval(dateFrom, today)) {
+                    checkmarkList.add(entry.value)
+                    noteList.add(entry.notes)
                 }
                 newData.checkmarks[habit.id] = checkmarkList.toIntArray()
                 newData.notes[habit.id] = noteList.toTypedArray()

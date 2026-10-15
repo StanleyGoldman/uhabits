@@ -27,9 +27,9 @@ class EntryRepositoryTest {
 
         assertEquals(0, repo.findAllByHabitId(habitId).size)
 
-        val d1 = EntryData(habitId = habitId, timestamp = 1700000000000, value = 2, notes = "")
-        val d2 = EntryData(habitId = habitId, timestamp = 1700100000000, value = 2, notes = "good")
-        val d3 = EntryData(habitId = habitId, timestamp = 1700200000000, value = 1, notes = "")
+        val d1 = EntryData(habitId = habitId, timestamp = 1700000000000, state = 2, notes = "")
+        val d2 = EntryData(habitId = habitId, timestamp = 1700100000000, state = 2, notes = "good")
+        val d3 = EntryData(habitId = habitId, timestamp = 1700200000000, state = 1, notes = "")
         repo.insert(d1)
         repo.insert(d2)
         repo.insert(d3)
@@ -50,9 +50,9 @@ class EntryRepositoryTest {
         val repo = EntryRepository(db)
         val habitId = insertTestHabit(db)
 
-        repo.insert(EntryData(habitId = habitId, timestamp = 1000, value = 2))
-        repo.insert(EntryData(habitId = habitId, timestamp = 2000, value = 2))
-        repo.insert(EntryData(habitId = habitId, timestamp = 3000, value = 2))
+        repo.insert(EntryData(habitId = habitId, timestamp = 1000, state = 2))
+        repo.insert(EntryData(habitId = habitId, timestamp = 2000, state = 2))
+        repo.insert(EntryData(habitId = habitId, timestamp = 3000, state = 2))
 
         repo.deleteByHabitIdAndTimestamp(habitId, 2000)
         val remaining = repo.findAllByHabitId(habitId)
@@ -69,9 +69,9 @@ class EntryRepositoryTest {
         val habitA = insertTestHabit(db)
         val habitB = insertTestHabit(db)
 
-        repo.insert(EntryData(habitId = habitA, timestamp = 1000, value = 2))
-        repo.insert(EntryData(habitId = habitA, timestamp = 2000, value = 2))
-        repo.insert(EntryData(habitId = habitB, timestamp = 3000, value = 2))
+        repo.insert(EntryData(habitId = habitA, timestamp = 1000, state = 2))
+        repo.insert(EntryData(habitId = habitA, timestamp = 2000, state = 2))
+        repo.insert(EntryData(habitId = habitB, timestamp = 3000, state = 2))
 
         repo.deleteByHabitId(habitA)
         assertEquals(0, repo.findAllByHabitId(habitA).size)
@@ -87,12 +87,30 @@ class EntryRepositoryTest {
         val habitA = insertTestHabit(db)
         val habitB = insertTestHabit(db)
 
-        repo.insert(EntryData(habitId = habitA, timestamp = 1000, value = 2))
-        repo.insert(EntryData(habitId = habitB, timestamp = 2000, value = 1))
+        repo.insert(EntryData(habitId = habitA, timestamp = 1000, state = 2))
+        repo.insert(EntryData(habitId = habitB, timestamp = 2000, state = 1))
 
         assertEquals(1, repo.findAllByHabitId(habitA).size)
         assertEquals(1, repo.findAllByHabitId(habitB).size)
         assertEquals(0, repo.findAllByHabitId(9999).size)
+
+        db.close()
+    }
+
+    @Test
+    fun testAmountSurvivesRoundTrip() = runTest {
+        val db = TestDatabaseHelper.createEmptyDatabase()
+        val repo = EntryRepository(db)
+        val habitId = insertTestHabit(db)
+
+        repo.insert(EntryData(habitId = habitId, timestamp = 1000, state = 4, amount = 2500))
+        repo.insert(EntryData(habitId = habitId, timestamp = 2000, state = 3))
+
+        val (skip, amount) = repo.findAllByHabitId(habitId)
+        assertEquals(4, amount.state)
+        assertEquals(2500, amount.amount)
+        assertEquals(3, skip.state)
+        assertEquals(null, skip.amount)
 
         db.close()
     }
@@ -113,7 +131,7 @@ class EntryRepositoryTest {
         val original = EntryData(
             habitId = habitId,
             timestamp = 1700000000000,
-            value = 2,
+            state = 2,
             notes = "Felt great today"
         )
         original.id = repo.insert(original)
@@ -121,7 +139,8 @@ class EntryRepositoryTest {
         val loaded = repo.findAllByHabitId(habitId).single()
         assertEquals(original.habitId, loaded.habitId)
         assertEquals(original.timestamp, loaded.timestamp)
-        assertEquals(original.value, loaded.value)
+        assertEquals(original.state, loaded.state)
+        assertEquals(original.amount, loaded.amount)
         assertEquals(original.notes, loaded.notes)
 
         db.close()

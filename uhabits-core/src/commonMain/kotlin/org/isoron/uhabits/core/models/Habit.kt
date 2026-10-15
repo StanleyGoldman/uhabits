@@ -38,6 +38,9 @@ data class Habit(
     var type: HabitType = HabitType.YES_NO,
     var unit: String = "",
     var uuid: String? = null,
+    var targetPeriodMode: TargetPeriodMode = TargetPeriodMode.CALENDAR,
+    var assumeNone: Boolean = true,
+    var skipReminderIfLogged: Boolean = false,
     val computedEntries: EntryList,
     val originalEntries: EntryList,
     val scores: ScoreList,
@@ -124,6 +127,9 @@ data class Habit(
         this.type = other.type
         this.unit = other.unit
         this.uuid = other.uuid
+        this.targetPeriodMode = other.targetPeriodMode
+        this.assumeNone = other.assumeNone
+        this.skipReminderIfLogged = other.skipReminderIfLogged
     }
 
     override fun equals(other: Any?): Boolean {
@@ -144,6 +150,9 @@ data class Habit(
         if (type != other.type) return false
         if (unit != other.unit) return false
         if (uuid != other.uuid) return false
+        if (targetPeriodMode != other.targetPeriodMode) return false
+        if (assumeNone != other.assumeNone) return false
+        if (skipReminderIfLogged != other.skipReminderIfLogged) return false
 
         return true
     }
@@ -163,6 +172,9 @@ data class Habit(
         result = 31 * result + type.value
         result = 31 * result + unit.hashCode()
         result = 31 * result + (uuid?.hashCode() ?: 0)
+        result = 31 * result + targetPeriodMode.value
+        result = 31 * result + assumeNone.hashCode()
+        result = 31 * result + skipReminderIfLogged.hashCode()
         return result
     }
 }

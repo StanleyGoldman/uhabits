@@ -31,6 +31,7 @@ import org.isoron.uhabits.core.models.ModelFactory
 import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.models.PaletteColor
 import org.isoron.uhabits.core.models.Reminder
+import org.isoron.uhabits.core.models.TargetPeriodMode
 import org.isoron.uhabits.core.models.WeekdayList
 import org.isoron.uhabits.core.models.memory.MemoryHabitList
 
@@ -53,7 +54,7 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
             if (rec.position != expectedPosition) shouldRebuildOrder = true
             val h = modelFactory.buildHabit()
             copyTo(rec, h)
-            (h.originalEntries as SQLiteEntryList).habitId = h.id
+            bindEntries(h)
             list.add(h)
         }
         if (shouldRebuildOrder) rebuildOrder()
@@ -67,7 +68,7 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
         val data = copyFrom(habit)
         val id = repository.insert(data)
         habit.id = id
-        (habit.originalEntries as SQLiteEntryList).habitId = id
+        bindEntries(habit)
         list.add(habit)
         observable.notifyListeners()
     }
@@ -205,6 +206,12 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
         observable.notifyListeners()
     }
 
+    private fun bindEntries(habit: Habit) {
+        val entries = habit.originalEntries as SQLiteEntryList
+        entries.habitId = habit.id
+        entries.isNumerical = { habit.isNumerical }
+    }
+
     @Synchronized
     fun reload() {
         loaded = false
@@ -231,7 +238,10 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
                 targetValue = habit.targetValue,
                 targetType = habit.targetType.value,
                 unit = habit.unit,
-                uuid = habit.uuid
+                uuid = habit.uuid,
+                targetPeriodMode = habit.targetPeriodMode.value,
+                assumeNone = if (habit.assumeNone) 1 else 0,
+                skipReminderIfLogged = if (habit.skipReminderIfLogged) 1 else 0
             )
         }
 
@@ -249,6 +259,9 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
             habit.unit = data.unit
             habit.position = data.position
             habit.uuid = data.uuid
+            habit.targetPeriodMode = TargetPeriodMode.fromInt(data.targetPeriodMode)
+            habit.assumeNone = data.assumeNone != 0
+            habit.skipReminderIfLogged = data.skipReminderIfLogged != 0
             if (data.reminderHour != null && data.reminderMin != null) {
                 habit.reminder = Reminder(
                     data.reminderHour!!,

@@ -20,11 +20,47 @@ package org.isoron.uhabits.core.models
 
 import org.isoron.platform.time.LocalDate
 
+/**
+ * What the user recorded on one day: a [state], an [amount] when the state is
+ * [AMOUNT], and notes.
+ *
+ * Measurable entries are [AMOUNT], [SKIP] or [UNKNOWN]; yes-or-no entries are
+ * [YES_MANUAL], [NO], [SKIP] or [UNKNOWN], and [YES_AUTO] is only computed.
+ */
 data class Entry(
     val date: LocalDate,
-    val value: Int,
+    val state: Int,
+    /** The amount ×1000, non-null only when [state] is [AMOUNT]. */
+    val amount: Int?,
     val notes: String = ""
 ) {
+    /**
+     * Builds an entry in the old single-value form, where a measurable habit's
+     * amount sits in [value]. Storage converts it with [toStateForm].
+     */
+    constructor(date: LocalDate, value: Int, notes: String = "") :
+        this(date, value, null, notes)
+
+    /**
+     * Compatibility view of the old single-value form: the amount when there
+     * is one, otherwise the state. Readers move to [state] and [amount].
+     */
+    val value: Int
+        get() = amount ?: state
+
+    /**
+     * Converts an entry that may be in the old single-value form into state
+     * and amount, using the same rules as migration 26.
+     */
+    fun toStateForm(isNumerical: Boolean): Entry {
+        if (!isNumerical || amount != null) return this
+        return when (state) {
+            SKIP, UNKNOWN -> this
+            YES_MANUAL -> copy(state = AMOUNT, amount = 1000)
+            else -> copy(state = AMOUNT, amount = state)
+        }
+    }
+
     val formattedValue: String
         get() = when (value) {
             YES_MANUAL -> "YES_MANUAL"
@@ -36,6 +72,11 @@ data class Entry(
         }
 
     companion object {
+        /**
+         * State of a measurable entry that records an amount.
+         */
+        const val AMOUNT = 4
+
         /**
          * Value indicating that the habit is not applicable for this timestamp.
          */

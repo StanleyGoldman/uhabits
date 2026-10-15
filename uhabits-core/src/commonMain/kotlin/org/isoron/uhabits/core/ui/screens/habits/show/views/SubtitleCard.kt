@@ -24,6 +24,7 @@ import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.models.PaletteColor
 import org.isoron.uhabits.core.models.Reminder
+import org.isoron.uhabits.core.models.TargetPeriodMode
 import org.isoron.uhabits.core.ui.views.Theme
 
 data class SubtitleCardState(
@@ -35,6 +36,7 @@ data class SubtitleCardState(
     val targetValue: Double = 0.0,
     val targetType: NumericalHabitType = NumericalHabitType.AT_LEAST,
     val unit: String = "",
+    val targetPeriodMode: TargetPeriodMode = TargetPeriodMode.CALENDAR,
     val theme: Theme
 )
 
@@ -52,6 +54,7 @@ class SubtitleCardPresenter {
             targetValue = habit.targetValue,
             targetType = habit.targetType,
             unit = habit.unit,
+            targetPeriodMode = habit.targetPeriodMode,
             theme = theme
         )
     }

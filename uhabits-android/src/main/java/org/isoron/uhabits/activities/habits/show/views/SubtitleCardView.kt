@@ -28,6 +28,7 @@ import org.isoron.platform.gui.toInt
 import org.isoron.uhabits.R
 import org.isoron.uhabits.activities.habits.edit.formatFrequency
 import org.isoron.uhabits.activities.habits.list.views.toShortString
+import org.isoron.uhabits.core.models.FrequencyLabel
 import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.ui.screens.habits.show.views.SubtitleCardState
 import org.isoron.uhabits.databinding.ShowHabitSubtitleBinding
@@ -50,8 +51,7 @@ class SubtitleCardView(context: Context, attrs: AttributeSet) : LinearLayout(con
         val color = state.theme.color(state.color).toInt()
         val reminder = state.reminder
         binding.frequencyLabel.text = formatFrequency(
-            state.frequency.numerator,
-            state.frequency.denominator,
+            FrequencyLabel.of(state.frequency, state.isNumerical, state.targetPeriodMode),
             resources
         )
         binding.questionLabel.setTextColor(color)

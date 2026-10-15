@@ -219,6 +219,13 @@
     <string name="measurable_question_example">e.g. How many miles did you run today?</string>
     <string name="measurable_units_example">e.g. miles</string>
     <string name="every_month">Every month</string>
+    <string name="frequency_hint_calendar_week">%1$s to %2$s</string>
+    <string name="frequency_hint_calendar_month">1st to end of month</string>
+    <string name="frequency_hint_rolling">Any %d days in a row</string>
+    <string name="assume_none">Count days with nothing entered as 0</string>
+    <string name="assume_none_on">Unrecorded days are under the limit (met)</string>
+    <string name="assume_none_off">Unrecorded days count as missed</string>
+    <string name="skip_reminder_if_logged">Skip if I\'ve logged anything today</string>
     <string name="validation_cannot_be_blank">Cannot be blank</string>
     <string name="today">Today</string>
     <string name="enter">Enter</string>

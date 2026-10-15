@@ -224,6 +224,53 @@
                         android:id="@+id/targetTypePicker"
                         android:textColor="?attr/contrast100"
                         />
+
+                    <View
+                        style="@style/FormDivider"
+                        android:id="@+id/assumeNoneDivider"/>
+
+                    <LinearLayout
+                        android:id="@+id/assumeNoneRow"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="16dp"
+                        android:paddingTop="12dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="12dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/assume_none"
+                                android:textColor="?attr/contrast100"
+                                android:textSize="@dimen/regularTextSize" />
+
+                            <TextView
+                                android:id="@+id/assumeNoneSubtitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/assume_none_on"
+                                android:textColor="?attr/contrast60"
+                                android:textSize="@dimen/smallerTextSize" />
+                        </LinearLayout>
+
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/assumeNoneSwitch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:clickable="false"
+                            android:focusable="false" />
+                    </LinearLayout>
                 </LinearLayout>
             </FrameLayout>
 
@@ -248,6 +295,22 @@
                         style="@style/FormDropdown"
                         android:id="@+id/reminderDatePicker"
                         android:text="" />
+
+                    <View
+                        style="@style/FormDivider"
+                        android:id="@+id/skipReminderIfLoggedDivider"/>
+
+                    <androidx.appcompat.widget.AppCompatCheckBox
+                        android:id="@+id/skipReminderIfLoggedCheckbox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="8dp"
+                        android:paddingTop="12dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="12dp"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/skip_reminder_if_logged"
+                        android:textSize="@dimen/regularTextSize" />
                 </LinearLayout>
             </FrameLayout>
 

@@ -72,6 +72,7 @@ data class Habit(
 
     private fun measurableStatus(entry: Entry): DayStatus {
         if (entry.state == Entry.SKIP) return DayStatus.MET
+        if (entry.state == Entry.UNKNOWN) return DayStatus.OPEN
         val amount = (entry.amount ?: 0) / 1000.0
         // A day is only missed below an "at least" target, or met under an
         // "at most" cap, once it has closed, so today is never either.

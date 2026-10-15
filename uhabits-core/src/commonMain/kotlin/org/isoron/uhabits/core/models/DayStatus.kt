@@ -19,6 +19,7 @@
 package org.isoron.uhabits.core.models
 
 /**
- * How a habit stands for a day: still undecided, done, or failed.
+ * How a habit stands on a day: [OPEN] while still undecided, then [MET] or
+ * [MISSED].
  */
 enum class DayStatus { OPEN, MET, MISSED }

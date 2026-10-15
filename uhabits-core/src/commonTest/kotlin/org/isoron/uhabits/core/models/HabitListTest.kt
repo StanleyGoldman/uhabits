@@ -18,6 +18,7 @@
  */
 package org.isoron.uhabits.core.models
 
+import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.BaseUnitTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -159,7 +160,7 @@ class HabitListTest : BaseUnitTest() {
     }
 
     private fun Habit.withEntryToday(value: Int): Habit {
-        originalEntries.add(Entry(org.isoron.platform.time.getToday(), value))
+        originalEntries.add(Entry(getToday(), value))
         recompute()
         return this
     }

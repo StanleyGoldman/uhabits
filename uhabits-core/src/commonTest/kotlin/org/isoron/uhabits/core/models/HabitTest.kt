@@ -66,7 +66,7 @@ class HabitTest : BaseUnitTest() {
     }
 
     @Test
-    fun todayStatus_yesOrNo() {
+    fun test_todayStatus_yesOrNo() {
         val h = modelFactory.buildHabit()
         h.recompute()
         assertEquals(DayStatus.OPEN, h.todayStatus(), "unknown")
@@ -79,7 +79,7 @@ class HabitTest : BaseUnitTest() {
     }
 
     @Test
-    fun todayStatus_yesOrNo_yesAutoIsMet() {
+    fun test_todayStatus_yesOrNo_yesAutoIsMet() {
         val h = modelFactory.buildHabit()
         h.frequency = Frequency.WEEKLY
         h.originalEntries.add(Entry(getToday().minus(1), Entry.YES_MANUAL))
@@ -89,7 +89,7 @@ class HabitTest : BaseUnitTest() {
     }
 
     @Test
-    fun todayStatus_atLeast() {
+    fun test_todayStatus_atLeast() {
         val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0)
         assertEquals(DayStatus.OPEN, h.todayStatus(), "unknown")
         h.withAmountToday(4.0)
@@ -101,7 +101,7 @@ class HabitTest : BaseUnitTest() {
     }
 
     @Test
-    fun todayStatus_atMost() {
+    fun test_todayStatus_atMost() {
         val h = buildMeasurableHabit(NumericalHabitType.AT_MOST, 5.0)
         assertEquals(DayStatus.OPEN, h.todayStatus(), "unknown")
         h.withAmountToday(0.0)
@@ -115,7 +115,13 @@ class HabitTest : BaseUnitTest() {
     }
 
     @Test
-    fun todayStatus_measurableSkipIsMet() {
+    fun test_todayStatus_atLeastZero_unknownIsOpen() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 0.0)
+        assertEquals(DayStatus.OPEN, h.todayStatus())
+    }
+
+    @Test
+    fun test_todayStatus_measurableSkipIsMet() {
         val atLeast = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0)
         atLeast.withEntryToday(Entry.SKIP)
         assertEquals(DayStatus.MET, atLeast.todayStatus(), "at least")

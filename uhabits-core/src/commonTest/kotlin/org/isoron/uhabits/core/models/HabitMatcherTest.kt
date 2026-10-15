@@ -125,11 +125,40 @@ class HabitMatcherTest : BaseUnitTest() {
         assertEquals(emptyList(), habits.filter(HabitMatcher(isEnteredAllowed = false)::matches))
     }
 
-    private fun buildMeasurableHabit(name: String): Habit {
+    @Test
+    fun testHideCompleted_hidesHabitsMetToday() {
+        val yes = buildHabit("Yes").withEntryToday(Entry.YES_MANUAL)
+        val skip = buildHabit("Skip").withEntryToday(Entry.SKIP)
+        val atTarget = buildMeasurableHabit("At target").withEntryToday(10000)
+        val measurableSkip = buildMeasurableHabit("Measurable skip").withEntryToday(Entry.SKIP)
+
+        val habits = listOf(yes, skip, atTarget, measurableSkip)
+        assertEquals(emptyList(), habits.filter(HabitMatcher(isCompletedAllowed = false)::matches))
+    }
+
+    @Test
+    fun testHideCompleted_keepsHabitsOpenOrMissedToday() {
+        val untouched = buildHabit("Untouched")
+        val no = buildHabit("No").withEntryToday(Entry.NO)
+        val belowTarget = buildMeasurableHabit("Below target").withEntryToday(4000)
+        val underCap = buildMeasurableHabit("Under cap", NumericalHabitType.AT_MOST, 5.0)
+            .withEntryToday(1000)
+        val overCap = buildMeasurableHabit("Over cap", NumericalHabitType.AT_MOST, 5.0)
+            .withEntryToday(6000)
+
+        val habits = listOf(untouched, no, belowTarget, underCap, overCap)
+        assertEquals(habits, habits.filter(HabitMatcher(isCompletedAllowed = false)::matches))
+    }
+
+    private fun buildMeasurableHabit(
+        name: String,
+        targetType: NumericalHabitType = NumericalHabitType.AT_LEAST,
+        targetValue: Double = 10.0
+    ): Habit {
         return buildHabit(name).apply {
             type = HabitType.NUMERICAL
-            targetType = NumericalHabitType.AT_LEAST
-            targetValue = 10.0
+            this.targetType = targetType
+            this.targetValue = targetValue
         }
     }
 

@@ -33,6 +33,7 @@ import kotlinx.coroutines.test.runTest
 import org.isoron.platform.io.UserFile
 import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.BaseUnitTest
+import org.isoron.uhabits.core.models.DayStatus
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitMatcher
@@ -174,7 +175,7 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
 
     @Test
     fun testOnToggle() {
-        assertTrue(habit1.isCompletedToday())
+        assertEquals(DayStatus.MET, habit1.todayStatus())
         behavior.onToggle(
             habit = habit1,
             date = getToday(),
@@ -183,7 +184,7 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
             x = 0f,
             y = 0f
         )
-        assertFalse(habit1.isCompletedToday())
+        assertEquals(DayStatus.MISSED, habit1.todayStatus())
     }
 
     @Test

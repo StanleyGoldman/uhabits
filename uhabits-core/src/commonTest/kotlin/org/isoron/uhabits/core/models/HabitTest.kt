@@ -66,12 +66,68 @@ class HabitTest : BaseUnitTest() {
     }
 
     @Test
-    fun test_isCompleted() {
+    fun test_todayStatus_yesOrNo() {
         val h = modelFactory.buildHabit()
-        assertFalse(h.isCompletedToday())
-        h.originalEntries.add(Entry(getToday(), Entry.YES_MANUAL))
         h.recompute()
-        assertTrue(h.isCompletedToday())
+        assertEquals(DayStatus.OPEN, h.todayStatus(), "unknown")
+        h.withEntryToday(Entry.YES_MANUAL)
+        assertEquals(DayStatus.MET, h.todayStatus(), "yes (manual)")
+        h.withEntryToday(Entry.SKIP)
+        assertEquals(DayStatus.MET, h.todayStatus(), "skip")
+        h.withEntryToday(Entry.NO)
+        assertEquals(DayStatus.MISSED, h.todayStatus(), "no")
+    }
+
+    @Test
+    fun test_todayStatus_yesOrNo_yesAutoIsMet() {
+        val h = modelFactory.buildHabit()
+        h.frequency = Frequency.WEEKLY
+        h.originalEntries.add(Entry(getToday().minus(1), Entry.YES_MANUAL))
+        h.recompute()
+        assertEquals(Entry.YES_AUTO, h.computedEntries.get(getToday()).value, "setup")
+        assertEquals(DayStatus.MET, h.todayStatus())
+    }
+
+    @Test
+    fun test_todayStatus_atLeast() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0)
+        assertEquals(DayStatus.OPEN, h.todayStatus(), "unknown")
+        h.withAmountToday(4.0)
+        assertEquals(DayStatus.OPEN, h.todayStatus(), "below the target")
+        h.withAmountToday(10.0)
+        assertEquals(DayStatus.MET, h.todayStatus(), "at the target")
+        h.withAmountToday(12.0)
+        assertEquals(DayStatus.MET, h.todayStatus(), "above the target")
+    }
+
+    @Test
+    fun test_todayStatus_atMost() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_MOST, 5.0)
+        assertEquals(DayStatus.OPEN, h.todayStatus(), "unknown")
+        h.withAmountToday(0.0)
+        assertEquals(DayStatus.OPEN, h.todayStatus(), "zero")
+        h.withAmountToday(1.0)
+        assertEquals(DayStatus.OPEN, h.todayStatus(), "under the cap")
+        h.withAmountToday(5.0)
+        assertEquals(DayStatus.OPEN, h.todayStatus(), "at the cap")
+        h.withAmountToday(6.0)
+        assertEquals(DayStatus.MISSED, h.todayStatus(), "over the cap")
+    }
+
+    @Test
+    fun test_todayStatus_atLeastZero_unknownIsOpen() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 0.0)
+        assertEquals(DayStatus.OPEN, h.todayStatus())
+    }
+
+    @Test
+    fun test_todayStatus_measurableSkipIsMet() {
+        val atLeast = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0)
+        atLeast.withEntryToday(Entry.SKIP)
+        assertEquals(DayStatus.MET, atLeast.todayStatus(), "at least")
+        val atMost = buildMeasurableHabit(NumericalHabitType.AT_MOST, 5.0)
+        atMost.withEntryToday(Entry.SKIP)
+        assertEquals(DayStatus.MET, atMost.todayStatus(), "at most")
     }
 
     @Test
@@ -83,32 +139,23 @@ class HabitTest : BaseUnitTest() {
         assertTrue(h.isEnteredToday())
     }
 
-    @Test
-    fun test_isCompleted_numerical() {
+    private fun buildMeasurableHabit(targetType: NumericalHabitType, target: Double): Habit {
         val h = modelFactory.buildHabit()
         h.type = HabitType.NUMERICAL
-        h.targetType = NumericalHabitType.AT_LEAST
-        h.targetValue = 100.0
-        assertFalse(h.isCompletedToday())
-        h.originalEntries.add(Entry(getToday(), 200000))
+        h.targetType = targetType
+        h.targetValue = target
         h.recompute()
-        assertTrue(h.isCompletedToday())
-        h.originalEntries.add(Entry(getToday(), 100000))
-        h.recompute()
-        assertTrue(h.isCompletedToday())
-        h.originalEntries.add(Entry(getToday(), 50000))
-        h.recompute()
-        assertFalse(h.isCompletedToday())
-        h.targetType = NumericalHabitType.AT_MOST
-        h.originalEntries.add(Entry(getToday(), 200000))
-        h.recompute()
-        assertFalse(h.isCompletedToday())
-        h.originalEntries.add(Entry(getToday(), 100000))
-        h.recompute()
-        assertFalse(h.isCompletedToday())
-        h.originalEntries.add(Entry(getToday(), 50000))
-        h.recompute()
-        assertFalse(h.isCompletedToday())
+        return h
+    }
+
+    private fun Habit.withAmountToday(amount: Double) {
+        originalEntries.add(Entry(getToday(), Entry.AMOUNT, (amount * 1000).toInt()))
+        recompute()
+    }
+
+    private fun Habit.withEntryToday(value: Int) {
+        originalEntries.add(Entry(getToday(), value))
+        recompute()
     }
 
     @Test

@@ -25,7 +25,7 @@ ANDROID_SERIAL=emulator-6340 ./gradlew :uhabits-android:connectedDebugAndroidTes
   -Pandroid.testInstrumentationRunnerArguments.class=<fully.qualified.TestClass>[#method]
 ```
 
-A failing render is saved on the device. Gradle uninstalls the app after the run, deleting that render, unless you pass `leaveApksInstalledAfterRun`. Results are in `uhabits-android/build/outputs/androidTest-results/connected/debug/*.xml`.
+A failing render is saved on the device. Gradle uninstalls the app after the run, deleting that render, unless you pass `leaveApksInstalledAfterRun`. Read the outcome with `.claude/scripts/android-test-results.sh` (one JSON line: status, failing tests and their first message). Clear `uhabits-android/build/outputs/androidTest-results/connected` before a run whose results must stand alone; Gradle keeps earlier runs' XML there.
 
 Check: the failure for your render reads "Could not open expected image" (a new baseline) or "Image differs", and every other test in the class passes. If an existing, untouched render fails too, the emulator doesn't match the baselines: fix step 1 or 2 before recording anything.
 

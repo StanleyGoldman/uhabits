@@ -149,8 +149,11 @@ A measurable habit's amount so far in the current day, week, month, quarter and 
 ### Reminders
 
 **Reminder**:
-A notification for a habit at a chosen time on chosen days, asking its question. It fires only while today's day status is open, so it stays quiet once the day is met or missed.
+A notification for a habit at a chosen time on chosen days, asking its question. It fires only while today's day status is open, so it stays quiet once the day, or a measurable habit's target period, is met or missed.
 _Avoid_: Alarm, notification
+
+**Skip if logged**:
+A per-habit setting on a measurable habit's reminder ("Skip if I've logged anything today"): when on, the reminder stays quiet on any day the habit is **entered (today)**, i.e. has an amount or a skip, even while its target period is open. Off by default.
 
 **Snooze**:
 Postponing a shown reminder ("Later") by a chosen delay.

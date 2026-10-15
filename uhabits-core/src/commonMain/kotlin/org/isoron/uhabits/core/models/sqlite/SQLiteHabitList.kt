@@ -209,7 +209,6 @@ class SQLiteHabitList(private val modelFactory: ModelFactory) : HabitList() {
     private fun bindEntries(habit: Habit) {
         val entries = habit.originalEntries as SQLiteEntryList
         entries.habitId = habit.id
-        entries.isNumerical = { habit.isNumerical }
     }
 
     @Synchronized

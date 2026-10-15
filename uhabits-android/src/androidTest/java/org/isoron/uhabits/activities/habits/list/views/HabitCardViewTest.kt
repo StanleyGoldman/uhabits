@@ -51,11 +51,11 @@ class HabitCardViewTest : BaseViewTest() {
         val entries = habit1
             .computedEntries
             .getByInterval(today.minus(300), today)
-            .map { it.value }.toIntArray()
+            .map { it.state }.toIntArray()
 
         view = component.getHabitCardViewFactory().create().apply {
             habit = habit1
-            values = entries
+            states = entries
             score = habit1.scores[today].value
             isSelected = false
             buttonCount = 5
@@ -84,12 +84,12 @@ class HabitCardViewTest : BaseViewTest() {
             .computedEntries
             .getByInterval(today.minus(300), today)
         val entryStates = entries
-            .map { it.toStateForm(isNumerical = true).state }.toIntArray()
+            .map { it.state }.toIntArray()
 
         view.apply {
             habit = habit2
-            values = entries.map { it.value }.toIntArray()
             states = entryStates
+            amounts = entries.map { it.amount ?: 0 }.toIntArray()
         }
         assertRenders(view, "$PATH/render_numerical.png")
     }

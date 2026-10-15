@@ -174,8 +174,7 @@ class HabitsCSVExporterTest : BaseUnitTest() {
             Entry(LocalDate(2015, 1, 20), Entry.AMOUNT, 0),
             Entry(LocalDate(2015, 1, 19), Entry.AMOUNT, 2),
             Entry(LocalDate(2015, 1, 18), Entry.AMOUNT, 1000),
-            // Old single-value form, which the in-memory entry list keeps as is
-            Entry(LocalDate(2015, 1, 17), 750)
+            Entry(LocalDate(2015, 1, 17), Entry.AMOUNT, 750)
         )
         for (e in entries) habit.originalEntries.add(e)
         habit.recompute()

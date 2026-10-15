@@ -63,7 +63,7 @@ class NotificationTrayTest : BaseUnitTest() {
         habit.frequency = Frequency.WEEKLY
         habit.originalEntries.add(Entry(getToday().minus(1), Entry.YES_MANUAL))
         habit.recompute()
-        assertEquals(Entry.YES_AUTO, habit.computedEntries.get(getToday()).value, "setup")
+        assertEquals(Entry.YES_AUTO, habit.computedEntries.get(getToday()).state, "setup")
         assertReminderShown(false, habit)
     }
 
@@ -147,7 +147,7 @@ class NotificationTrayTest : BaseUnitTest() {
     fun skipIfLogged_firesWhenTodayHasOnlyNotes() {
         val habit = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0)
         habit.skipReminderIfLogged = true
-        habit.originalEntries.add(Entry(getToday(), Entry.UNKNOWN, "felt tired"))
+        habit.originalEntries.add(Entry(getToday(), Entry.UNKNOWN, notes = "felt tired"))
         habit.recompute()
         assertReminderShown(true, habit)
     }
@@ -188,8 +188,8 @@ class NotificationTrayTest : BaseUnitTest() {
 
     private fun yesterday(): LocalDate = getToday().minus(1)
 
-    private fun Habit.withEntryToday(value: Int): Habit {
-        originalEntries.add(Entry(getToday(), value))
+    private fun Habit.withEntryToday(state: Int): Habit {
+        originalEntries.add(Entry(getToday(), state))
         recompute()
         return this
     }

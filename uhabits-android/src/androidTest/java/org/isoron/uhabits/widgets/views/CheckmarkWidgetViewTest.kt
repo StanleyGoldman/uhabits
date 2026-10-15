@@ -47,7 +47,7 @@ class CheckmarkWidgetViewTest : BaseViewTest() {
         val score = scores[today].value
         view = CheckmarkWidgetView(targetContext).apply {
             activeColor = getAndroidTestColor(0)
-            entryState = computedEntries.get(today).value
+            entryState = computedEntries.get(today).state
             percentage = score.toFloat()
             name = habit.name
         }

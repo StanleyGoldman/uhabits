@@ -83,7 +83,7 @@ class HabitCardListCacheTest : BaseUnitTest() {
     @Test
     fun testCommandListener_single() {
         val h2 = habitList.getByPosition(2)
-        commandRunner.run(CreateRepetitionCommand(habitList, h2, today, Entry.NO, ""))
+        commandRunner.run(CreateRepetitionCommand(habitList, h2, today, Entry.NO, amount = null, notes = ""))
         verify { listener.onItemChanged(2) }
         verify { listener.onRefreshFinished() }
         verifyNoMoreCalls(listener)
@@ -96,13 +96,9 @@ class HabitCardListCacheTest : BaseUnitTest() {
         val score = h.scores[today].value
         assertEquals(h, cache.getHabitByPosition(3))
         assertEquals(score, cache.getScore(h.id!!))
-        val actualCheckmarks = cache.getCheckmarks(h.id!!)
-
-        val expectedCheckmarks = h
-            .computedEntries
-            .getByInterval(today.minus(9), today)
-            .map { it.value }.toIntArray()
-        assertContentEquals(expectedCheckmarks, actualCheckmarks)
+        val entries = h.computedEntries.getByInterval(today.minus(9), today)
+        assertContentEquals(entries.map { it.state }.toIntArray(), cache.getStates(h.id!!))
+        assertContentEquals(entries.map { it.amount ?: 0 }.toIntArray(), cache.getAmounts(h.id!!))
     }
 
     @Test
@@ -121,18 +117,6 @@ class HabitCardListCacheTest : BaseUnitTest() {
             intArrayOf(Entry.AMOUNT, Entry.SKIP, Entry.UNKNOWN),
             states.sliceArray(0..2)
         )
-    }
-
-    @Test
-    fun testGetCheckmarks_measurableOldFormYesReadsAsAmountOfOne() {
-        val h = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
-        h.originalEntries.add(Entry(today, Entry.YES_MANUAL))
-        h.recompute()
-        habitList.add(h)
-        cache.refreshAllHabits()
-
-        assertEquals(1000, cache.getCheckmarks(h.id!!)[0])
-        assertEquals(Entry.AMOUNT, cache.getStates(h.id!!)[0])
     }
 
     @Test
@@ -216,7 +200,7 @@ class HabitCardListCacheTest : BaseUnitTest() {
         val h = addHabitHiddenOnceEntered()
         val other = addHabitHiddenOnceEntered()
         toggle(h, Entry.YES_MANUAL)
-        commandRunner.run(CreateRepetitionCommand(habitList, other, getToday(), Entry.YES_MANUAL, ""))
+        commandRunner.run(CreateRepetitionCommand(habitList, other, getToday(), Entry.YES_MANUAL, amount = null, notes = ""))
         assertTrue(isVisible(h))
         assertFalse(isVisible(other))
     }
@@ -246,7 +230,7 @@ class HabitCardListCacheTest : BaseUnitTest() {
     fun testOnDetached_endsAllGracePeriods() {
         val h = addHabitHiddenOnceEntered()
         cache.holdUntilEnded(h.id!!)
-        commandRunner.run(CreateRepetitionCommand(habitList, h, getToday(), Entry.YES_MANUAL, ""))
+        commandRunner.run(CreateRepetitionCommand(habitList, h, getToday(), Entry.YES_MANUAL, amount = null, notes = ""))
         assertTrue(isVisible(h))
         cache.onDetached()
         cache.refreshAllHabits()
@@ -264,7 +248,7 @@ class HabitCardListCacheTest : BaseUnitTest() {
 
     private fun toggle(h: Habit, value: Int, date: LocalDate = getToday()) {
         cache.startGracePeriod(h.id!!)
-        commandRunner.run(CreateRepetitionCommand(habitList, h, date, value, ""))
+        commandRunner.run(CreateRepetitionCommand(habitList, h, date, value, amount = null, notes = ""))
     }
 
     private fun advanceBy(duration: Duration) {

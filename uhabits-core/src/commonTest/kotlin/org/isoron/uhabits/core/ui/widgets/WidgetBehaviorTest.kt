@@ -69,7 +69,7 @@ class WidgetBehaviorTest : BaseUnitTest() {
         behavior.onAddRepetition(habit, today)
         verify {
             commandRunner.run(
-                CreateRepetitionCommand(habitList, habit, today, Entry.YES_MANUAL, "")
+                CreateRepetitionCommand(habitList, habit, today, Entry.YES_MANUAL, amount = null, notes = "")
             )
         }
         verify { notificationTray.cancel(habit) }
@@ -81,7 +81,7 @@ class WidgetBehaviorTest : BaseUnitTest() {
         behavior.onRemoveRepetition(habit, today)
         verify {
             commandRunner.run(
-                CreateRepetitionCommand(habitList, habit, today, Entry.NO, "")
+                CreateRepetitionCommand(habitList, habit, today, Entry.NO, amount = null, notes = "")
             )
         }
         verify { notificationTray.cancel(habit) }
@@ -109,7 +109,7 @@ class WidgetBehaviorTest : BaseUnitTest() {
             verify { preferences.isSkipEnabled }
             verify {
                 commandRunner.run(
-                    CreateRepetitionCommand(habitList, habit, today, nextValue, "")
+                    CreateRepetitionCommand(habitList, habit, today, nextValue, amount = null, notes = "")
                 )
             }
             verify {

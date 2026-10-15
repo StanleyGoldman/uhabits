@@ -229,7 +229,7 @@ class FrequencyChart : ScrollableChart {
     }
 
     private fun drawMarker(canvas: Canvas, rect: RectF?, value: Int?, weekdayFrequency: Int) {
-        // value can be negative when the entry is skipped
+        // A month of negative amounts sums below zero; draw it as no mark
         val valueCopy = value?.let { max(0, it) }
 
         val padding = rect!!.height() * 0.2f

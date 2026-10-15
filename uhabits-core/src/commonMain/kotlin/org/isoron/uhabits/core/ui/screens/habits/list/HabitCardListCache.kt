@@ -87,9 +87,10 @@ class HabitCardListCache(
         currentFetchTask?.cancel()
     }
 
+    /** Each day's amount ×1000, newest first; 0 on a day without one. */
     @Synchronized
-    fun getCheckmarks(habitId: Long): IntArray {
-        return data.checkmarks[habitId]!!
+    fun getAmounts(habitId: Long): IntArray {
+        return data.amounts[habitId]!!
     }
 
     @Synchronized
@@ -188,7 +189,7 @@ class HabitCardListCache(
         val position = data.habits.indexOf(h)
         data.habits.removeAt(position)
         data.idToHabit.remove(id)
-        data.checkmarks.remove(id)
+        data.amounts.remove(id)
         data.states.remove(id)
         data.notes.remove(id)
         data.scores.remove(id)
@@ -286,21 +287,21 @@ class HabitCardListCache(
     private inner class CacheData {
         val idToHabit: MutableMap<Long?, Habit> = mutableMapOf()
         val habits: MutableList<Habit>
-        val checkmarks: MutableMap<Long?, IntArray>
+        val amounts: MutableMap<Long?, IntArray>
         val states: MutableMap<Long?, IntArray>
         val scores: MutableMap<Long?, Double>
         val notes: MutableMap<Long?, Array<String>>
 
         @Synchronized
-        fun copyCheckmarksFrom(oldData: CacheData) {
+        fun copyEntriesFrom(oldData: CacheData) {
             val empty = IntArray(checkmarkCount)
             for (id in idToHabit.keys) {
-                if (oldData.checkmarks.containsKey(id)) {
-                    checkmarks[id] =
-                        oldData.checkmarks[id]!!
+                if (oldData.amounts.containsKey(id)) {
+                    amounts[id] =
+                        oldData.amounts[id]!!
                     states[id] = oldData.states[id]!!
                 } else {
-                    checkmarks[id] = empty
+                    amounts[id] = empty
                     states[id] = empty
                 }
             }
@@ -345,7 +346,7 @@ class HabitCardListCache(
          */
         init {
             habits = mutableListOf()
-            checkmarks = mutableMapOf()
+            amounts = mutableMapOf()
             states = mutableMapOf()
             scores = mutableMapOf()
             notes = mutableMapOf()
@@ -382,7 +383,7 @@ class HabitCardListCache(
         override suspend fun doInBackground() {
             newData.fetchHabits(heldIds, matcher)
             newData.copyScoresFrom(data)
-            newData.copyCheckmarksFrom(data)
+            newData.copyEntriesFrom(data)
             newData.copyNoteIndicatorsFrom(data)
             val today = getToday()
             val dateFrom = today.minus(checkmarkCount - 1)
@@ -392,16 +393,15 @@ class HabitCardListCache(
                 val habit = newData.habits[position]
                 if (targetId != null && targetId != habit.id) continue
                 newData.scores[habit.id] = habit.scores[today].value
-                val checkmarkList = mutableListOf<Int>()
+                val amountList = mutableListOf<Int>()
                 val stateList = mutableListOf<Int>()
                 val noteList = mutableListOf<String>()
-                for (computed in habit.computedEntries.getByInterval(dateFrom, today)) {
-                    val entry = computed.toStateForm(habit.isNumerical)
-                    checkmarkList.add(entry.value)
+                for (entry in habit.computedEntries.getByInterval(dateFrom, today)) {
+                    amountList.add(entry.amount ?: 0)
                     stateList.add(entry.state)
                     noteList.add(entry.notes)
                 }
-                newData.checkmarks[habit.id] = checkmarkList.toIntArray()
+                newData.amounts[habit.id] = amountList.toIntArray()
                 newData.states[habit.id] = stateList.toIntArray()
                 newData.notes[habit.id] = noteList.toTypedArray()
                 runner!!.publishProgress(this, position)
@@ -430,7 +430,7 @@ class HabitCardListCache(
             data.habits.add(position, habit)
             data.idToHabit[id] = habit
             data.scores[id] = newData.scores[id]!!
-            data.checkmarks[id] = newData.checkmarks[id]!!
+            data.amounts[id] = newData.amounts[id]!!
             data.states[id] = newData.states[id]!!
             data.notes[id] = newData.notes[id]!!
             listener.onItemInserted(position)
@@ -459,21 +459,21 @@ class HabitCardListCache(
         @Synchronized
         private fun performUpdate(id: Long, position: Int) {
             val oldScore = data.scores[id]!!
-            val oldCheckmarks = data.checkmarks[id]
+            val oldAmounts = data.amounts[id]
             val oldStates = data.states[id]
             val oldNoteIndicators = data.notes[id]
             val newScore = newData.scores[id]!!
-            val newCheckmarks = newData.checkmarks[id]!!
+            val newAmounts = newData.amounts[id]!!
             val newStates = newData.states[id]!!
             val newNoteIndicators = newData.notes[id]!!
             var unchanged = true
             if (oldScore != newScore) unchanged = false
-            if (!oldCheckmarks.contentEquals(newCheckmarks)) unchanged = false
+            if (!oldAmounts.contentEquals(newAmounts)) unchanged = false
             if (!oldStates.contentEquals(newStates)) unchanged = false
             if (!oldNoteIndicators.contentEquals(newNoteIndicators)) unchanged = false
             if (unchanged) return
             data.scores[id] = newScore
-            data.checkmarks[id] = newCheckmarks
+            data.amounts[id] = newAmounts
             data.states[id] = newStates
             data.notes[id] = newNoteIndicators
             listener.onItemChanged(position)

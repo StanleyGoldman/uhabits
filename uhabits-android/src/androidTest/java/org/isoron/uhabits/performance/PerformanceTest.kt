@@ -26,6 +26,7 @@ import org.isoron.platform.time.LocalDate
 import org.isoron.uhabits.BaseAndroidTest
 import org.isoron.uhabits.core.commands.CreateHabitCommand
 import org.isoron.uhabits.core.commands.CreateRepetitionCommand
+import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.sqlite.SQLModelFactory
 import org.junit.Ignore
@@ -61,7 +62,7 @@ class PerformanceTest : BaseAndroidTest() {
         val habit = fixtures.createEmptyHabit()
         var date = LocalDate(2000, 1, 1)
         for (i in 0..4999) {
-            CreateRepetitionCommand(habitList, habit, date, 1, "").run()
+            CreateRepetitionCommand(habitList, habit, date, Entry.YES_MANUAL, amount = null, notes = "").run()
             date = date.plus(1)
         }
         db.commit()

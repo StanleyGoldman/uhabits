@@ -287,14 +287,17 @@ class YesNoScoreListTest : BaseScoreListTest() {
 }
 
 open class NumericalScoreListTest : BaseScoreListTest() {
-    protected fun addEntry(day: Int, value: Int) {
-        val entries = habit.originalEntries
-        entries.add(Entry(today.minus(day), value))
+    protected fun addAmount(day: Int, amount: Int) {
+        habit.originalEntries.add(Entry(today.minus(day), Entry.AMOUNT, amount))
     }
 
-    protected fun addEntries(from: Int, to: Int, value: Int) {
-        val entries = habit.originalEntries
-        for (i in from until to) entries.add(Entry(today.minus(i), value))
+    protected fun addAmounts(from: Int, to: Int, amount: Int) {
+        for (i in from until to) addAmount(i, amount)
+        habit.recompute()
+    }
+
+    protected fun addSkips(from: Int, to: Int) {
+        for (i in from until to) habit.originalEntries.add(Entry(today.minus(i), Entry.SKIP))
         habit.recompute()
     }
 }
@@ -316,7 +319,7 @@ class NumericalAtLeastScoreListTest : NumericalScoreListTest() {
 
     @Test
     fun test_getValue() {
-        addEntries(0, 20, 2000)
+        addAmounts(0, 20, 2000)
         val expectedValues = doubleArrayOf(
             0.655747,
             0.636894,
@@ -348,7 +351,7 @@ class NumericalAtLeastScoreListTest : NumericalScoreListTest() {
     @Test
     fun test_recompute() {
         assertCloseTo(0.0, habit.scores[today].value, E)
-        addEntries(0, 2, 2000)
+        addAmounts(0, 2, 2000)
         assertCloseTo(0.101149, habit.scores[today].value, E)
         habit.frequency = Frequency(1, 2)
         habit.recompute()
@@ -360,30 +363,30 @@ class NumericalAtLeastScoreListTest : NumericalScoreListTest() {
         // Daily habits should achieve at least 99% in 3 months
         habit = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
         habit.frequency = Frequency.DAILY
-        for (i in 0..89) addEntry(i, 2000)
+        for (i in 0..89) addAmount(i, 2000)
         habit.recompute()
         assertTrue(habit.scores[today].value > 0.99)
 
         // Weekly habits should achieve at least 99% in 9 months
         habit = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
         habit.frequency = Frequency.WEEKLY
-        for (i in 0..38) addEntry(7 * i, 2000)
+        for (i in 0..38) addAmount(7 * i, 2000)
         habit.recompute()
         assertTrue(habit.scores[today].value > 0.99)
 
         // Monthly habits should achieve at least 99% in 18 months
         habit.frequency = Frequency(1, 30)
-        for (i in 0..17) addEntry(30 * i, 2000)
+        for (i in 0..17) addAmount(30 * i, 2000)
         habit.recompute()
         assertTrue(habit.scores[today].value > 0.99)
     }
 
     @Test
     fun shouldAchieveComparableScoreToProgress() {
-        addEntries(0, 500, 1000)
+        addAmounts(0, 500, 1000)
         assertCloseTo(0.5, habit.scores[today].value, E)
 
-        addEntries(0, 500, 500)
+        addAmounts(0, 500, 500)
         assertCloseTo(0.25, habit.scores[today].value, E)
     }
 
@@ -393,8 +396,8 @@ class NumericalAtLeastScoreListTest : NumericalScoreListTest() {
         // score should still converge to 100%
         habit.frequency = Frequency.WEEKLY
         for (k in 0..99) {
-            addEntry(14 * k, 2000)
-            addEntry(14 * k + 13, 2000)
+            addAmount(14 * k, 2000)
+            addAmount(14 * k + 13, 2000)
         }
         habit.recompute()
         assertCloseTo(1.0, habit.scores[today].value, 1e-3)
@@ -402,7 +405,7 @@ class NumericalAtLeastScoreListTest : NumericalScoreListTest() {
 
     @Test
     fun overeachievingIsntRelevant() {
-        addEntry(0, 10000000)
+        addAmount(0, 10000000)
         habit.recompute()
         assertCloseTo(0.051922, habit.scores[today].value, E)
     }
@@ -417,11 +420,11 @@ class NumericalAtLeastScoreListWithSkipTest : NumericalScoreListTest() {
 
     @Test
     fun test_getValue() {
-        addEntries(0, 10, 2000)
-        addEntries(10, 11, SKIP)
-        addEntries(11, 15, 2000)
-        addEntries(15, 16, SKIP)
-        addEntries(16, 20, 2000)
+        addAmounts(0, 10, 2000)
+        addSkips(10, 11)
+        addAmounts(11, 15, 2000)
+        addSkips(15, 16)
+        addAmounts(16, 20, 2000)
         val expectedValues = doubleArrayOf(
             0.617008,
             0.596033,
@@ -452,15 +455,15 @@ class NumericalAtLeastScoreListWithSkipTest : NumericalScoreListTest() {
 
     @Test
     fun skipsShouldNotAffectScore() {
-        addEntries(0, 500, 1000)
+        addAmounts(0, 500, 1000)
         val initialScore = habit.scores[today].value
 
-        addEntries(500, 1000, SKIP)
+        addSkips(500, 1000)
         assertCloseTo(initialScore, habit.scores[today].value, E)
 
-        addEntries(0, 300, 1000)
-        addEntries(300, 500, SKIP)
-        addEntries(500, 700, 1000)
+        addAmounts(0, 300, 1000)
+        addSkips(300, 500)
+        addAmounts(500, 700, 1000)
 
         // skipped days should be treated as if they never existed
         assertCloseTo(initialScore, habit.scores[today].value, E)
@@ -472,9 +475,9 @@ class NumericalAtLeastScoreListWithSkipTest : NumericalScoreListTest() {
         // after the skips should not drop below the score the habit had before them
         habit.frequency = Frequency.WEEKLY
         habit.targetValue = 7.0
-        addEntries(10, 14, SKIP)
-        addEntries(14, 500, 1000)
-        addEntries(0, 10, 1000)
+        addSkips(10, 14)
+        addAmounts(14, 500, 1000)
+        addAmounts(0, 10, 1000)
         val before = habit.scores[today.minus(14)].value
         for (i in 0..13) assertTrue(habit.scores[today.minus(i)].value >= before - E)
     }
@@ -498,8 +501,8 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
 
     @Test
     fun test_getValue() {
-        addEntry(20, 1000)
-        addEntries(0, 20, 5000)
+        addAmount(20, 1000)
+        addAmounts(0, 20, 5000)
         val expectedValues = doubleArrayOf(
             0.344253,
             0.363106,
@@ -532,7 +535,7 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
     fun test_recompute() {
         habit.recompute()
         assertCloseTo(1.0, habit.scores[today].value, E)
-        addEntries(0, 2, 5000)
+        addAmounts(0, 2, 5000)
         assertCloseTo(0.898850, habit.scores[today].value, E)
         habit.frequency = Frequency(1, 2)
         habit.recompute()
@@ -541,10 +544,10 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
 
     @Test
     fun shouldAchieveComparableScoreToProgress() {
-        addEntries(0, 500, 3000)
+        addAmounts(0, 500, 3000)
         assertCloseTo(0.5, habit.scores[today].value, E)
 
-        addEntries(0, 500, 3500)
+        addAmounts(0, 500, 3500)
         assertCloseTo(0.25, habit.scores[today].value, E)
     }
 
@@ -554,8 +557,8 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
         // score should stay at 100%
         habit.frequency = Frequency.WEEKLY
         for (k in 0..99) {
-            addEntry(14 * k, 2000)
-            addEntry(14 * k + 13, 2000)
+            addAmount(14 * k, 2000)
+            addAmount(14 * k + 13, 2000)
         }
         habit.recompute()
         assertCloseTo(1.0, habit.scores[today].value, 1e-3)
@@ -564,7 +567,7 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
     @Test
     fun withoutAssumeNoneScoreShouldStartAtZero() {
         habit.assumeNone = false
-        addEntries(0, 1, 0)
+        addAmounts(0, 1, 0)
         assertCloseTo(0.051922, habit.scores[today].value, E)
     }
 
@@ -573,7 +576,7 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
         // Within the cap for 498 days, then nothing entered yesterday or today: yesterday
         // grades 0, and today is still open, so it leaves the score unchanged
         habit.assumeNone = false
-        addEntries(2, 500, 0)
+        addAmounts(2, 500, 0)
         assertCloseTo(1.0, habit.scores[today.minus(2)].value, E)
         assertCloseTo(0.948078, habit.scores[today.minus(1)].value, E)
         assertCloseTo(0.948078, habit.scores[today].value, E)
@@ -581,7 +584,7 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
 
     @Test
     fun withAssumeNoneDaysWithNothingEnteredShouldBeMet() {
-        addEntries(2, 500, 0)
+        addAmounts(2, 500, 0)
         assertCloseTo(1.0, habit.scores[today.minus(1)].value, E)
         assertCloseTo(1.0, habit.scores[today].value, E)
     }
@@ -591,8 +594,8 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
         // "At most 2 per week" grades on 14 days against 4. With one skip in the window the
         // cap scales to 4 × 13/14 ≈ 3.7, so 4 goes over it
         habit.frequency = Frequency.WEEKLY
-        addEntries(1, 2, SKIP)
-        addEntries(0, 1, 4000)
+        addSkips(1, 2)
+        addAmounts(0, 1, 4000)
         assertTrue(habit.scores[today].value < 1.0)
     }
 
@@ -602,27 +605,27 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
         // should stay at 100%
         habit.frequency = Frequency.WEEKLY
         habit.targetValue = 0.0
-        addEntries(0, 100, 0)
-        addEntries(5, 6, SKIP)
+        addAmounts(0, 100, 0)
+        addSkips(5, 6)
         assertCloseTo(1.0, habit.scores[today].value, E)
     }
 
     @Test
     fun undereachievingIsntRelevant() {
-        addEntry(1, 10000000)
+        addAmount(1, 10000000)
         habit.recompute()
         assertCloseTo(0.950773, habit.scores[today].value, E)
     }
 
     @Test
     fun overeachievingIsntRelevant() {
-        addEntry(0, 5000)
+        addAmount(0, 5000)
 
-        addEntry(1, 0)
+        addAmount(1, 0)
         habit.recompute()
         assertCloseTo(0.948077, habit.scores[today].value, E)
 
-        addEntry(1, 1000)
+        addAmount(1, 1000)
         habit.recompute()
         assertCloseTo(0.948077, habit.scores[today].value, E)
     }

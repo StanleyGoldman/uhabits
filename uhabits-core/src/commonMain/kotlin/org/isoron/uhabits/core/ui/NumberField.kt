@@ -29,7 +29,7 @@ import kotlin.math.roundToLong
 data class NumberField(val text: String, val isSkipped: Boolean) {
     companion object {
         fun of(entry: Entry): NumberField {
-            val amount = entry.toStateForm(isNumerical = true).amount
+            val amount = entry.amount
                 ?: return NumberField("", isSkipped = entry.state == Entry.SKIP)
             return NumberField(formatHundredths((amount + 5).floorDiv(10)), false)
         }
@@ -55,7 +55,7 @@ sealed interface NumberInput {
 
     /** The entry this input records on the day whose entry was [previous]. */
     fun toEntry(previous: Entry, notes: String): Entry {
-        val before = previous.toStateForm(isNumerical = true).copy(notes = notes)
+        val before = previous.copy(notes = notes)
         return when (this) {
             is Typed -> {
                 val decimal = text.replace(',', '.')

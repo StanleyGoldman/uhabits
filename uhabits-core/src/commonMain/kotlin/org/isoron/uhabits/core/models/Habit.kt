@@ -89,7 +89,7 @@ data class Habit(
         get() = isNumerical && targetPeriod(getToday()) != null
 
     private fun yesOrNoStatus(date: LocalDate): DayStatus {
-        return when (computedEntries.get(date).value) {
+        return when (computedEntries.get(date).state) {
             Entry.UNKNOWN -> if (date < getToday()) DayStatus.MISSED else DayStatus.OPEN
             Entry.NO -> DayStatus.MISSED
             else -> DayStatus.MET
@@ -97,7 +97,7 @@ data class Habit(
     }
 
     private fun measurableDayStatus(date: LocalDate): DayStatus {
-        val entry = computedEntries.get(date).toStateForm(isNumerical = true)
+        val entry = computedEntries.get(date)
         if (entry.state == Entry.SKIP) return DayStatus.MET
         val isClosed = date < getToday()
         if (entry.state == Entry.UNKNOWN) {
@@ -242,15 +242,13 @@ data class Habit(
     /** A target period's entries in state form, newest first, and its days. */
     private inner class PeriodTally(period: ClosedRange<LocalDate>) {
         val entries = computedEntries.getByInterval(period.start, period.endInclusive)
-            .map { it.toStateForm(isNumerical = true) }
         val days = period.start.daysUntil(period.endInclusive) + 1L
         val daysThatCount = days - entries.count { it.state == Entry.SKIP }
     }
 
     fun isEnteredToday(): Boolean {
         val today = getToday()
-        val value = originalEntries.get(today).value
-        return value != Entry.UNKNOWN
+        return originalEntries.get(today).state != Entry.UNKNOWN
     }
 
     fun recompute() {

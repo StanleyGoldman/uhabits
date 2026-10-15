@@ -26,7 +26,6 @@ import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import dev.mokkery.spy
 import dev.mokkery.verify
-import dev.mokkery.verify.VerifyMode
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.runTest
@@ -100,7 +99,7 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
             screen.showNumberPopup(NumberField("0.1", false), "", any(), any())
         }
         capturedPicker!!.onNumberPicked(NumberInput.Typed("100"), "")
-        assertEquals(100000, habit2.computedEntries.get(today).value)
+        assertEquals(100000, habit2.computedEntries.get(today).amount)
     }
 
     @Test
@@ -179,7 +178,7 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
         behavior.onToggle(
             habit = habit1,
             date = getToday(),
-            value = Entry.NO,
+            state = Entry.NO,
             notes = "",
             x = 0f,
             y = 0f
@@ -297,13 +296,6 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
         openNumberPopup(Entry(getToday(), Entry.AMOUNT, 1235)).second
             .onNumberPicked(NumberInput.Typed("1,24"), "")
         assertEquals(Entry(getToday(), Entry.AMOUNT, 1235), todayEntry())
-    }
-
-    @Test
-    fun testOnEdit_savingAnUntouchedOldFormAmountShowsNoConfetti() {
-        val (field, picker) = openNumberPopup(Entry(getToday(), 2500))
-        picker.onNumberPicked(NumberInput.Typed(field.text), "")
-        verify(VerifyMode.not) { screen.showConfetti(any(), any(), any()) }
     }
 
     private fun addHabitHiddenOnceEntered(): Habit {

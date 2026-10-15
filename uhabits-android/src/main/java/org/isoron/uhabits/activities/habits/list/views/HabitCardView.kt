@@ -103,17 +103,18 @@ class HabitCardView(
             numberPanel.units = value
         }
 
-    var values
-        get() = checkmarkPanel.values
-        set(values) {
-            checkmarkPanel.values = values
-            numberPanel.values = values.map { it / 1000.0 }.toDoubleArray()
-        }
-
     var states
         get() = numberPanel.states
         set(states) {
+            checkmarkPanel.values = states
             numberPanel.states = states
+        }
+
+    /** Each day's amount ×1000, as the number panel shows it. */
+    var amounts = IntArray(0)
+        set(amounts) {
+            field = amounts
+            numberPanel.values = amounts.map { it / 1000.0 }.toDoubleArray()
         }
 
     var threshold: Double

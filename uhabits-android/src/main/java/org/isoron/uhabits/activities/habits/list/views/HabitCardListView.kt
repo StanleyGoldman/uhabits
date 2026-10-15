@@ -112,16 +112,16 @@ class HabitCardListView(
         holder: HabitCardViewHolder,
         habit: Habit,
         score: Double,
-        checkmarks: IntArray,
         states: IntArray,
+        amounts: IntArray,
         notes: Array<String>,
         selected: Boolean
     ): View {
         val cardView = holder.itemView as HabitCardView
         cardView.habit = habit
         cardView.isSelected = selected
-        cardView.values = checkmarks
         cardView.states = states
+        cardView.amounts = amounts
         cardView.buttonCount = checkmarkCount
         cardView.dataOffset = dataOffset
         cardView.score = score

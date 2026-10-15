@@ -78,7 +78,7 @@ class HabitsCSVExporter(
         val sb = StringBuilder()
         sb.append(csvLine(arrayOf("Date", "Value", "Notes")))
         for (entry in habit.computedEntries.getKnown()) {
-            sb.append(csvLine(arrayOf(entry.date.toCSVString(), csvValue(entry, habit), entry.notes)))
+            sb.append(csvLine(arrayOf(entry.date.toCSVString(), csvValue(entry), entry.notes)))
         }
         return sb.toString()
     }
@@ -115,7 +115,7 @@ class HabitsCSVExporter(
             val date = newest.minus(i).toCSVString()
             sb.append(date).append(delimiter)
             for (j in selectedHabits.indices) {
-                sb.append(csvValue(checkmarks[j][i], selectedHabits[j])).append(delimiter)
+                sb.append(csvValue(checkmarks[j][i])).append(delimiter)
             }
             sb.append("\n")
         }
@@ -126,15 +126,14 @@ class HabitsCSVExporter(
      * The entry's amount as a plain decimal (`2.5`, `5000`) when it has one,
      * otherwise its state's label.
      */
-    private fun csvValue(entry: Entry, habit: Habit): String {
-        val e = entry.toStateForm(habit.isNumerical)
-        return e.amount?.let { formatAmount(it) } ?: when (e.state) {
+    private fun csvValue(entry: Entry): String {
+        return entry.amount?.let { formatAmount(it) } ?: when (entry.state) {
             Entry.YES_MANUAL -> "YES_MANUAL"
             Entry.YES_AUTO -> "YES_AUTO"
             Entry.NO -> "NO"
             Entry.SKIP -> "SKIP"
             Entry.UNKNOWN -> "UNKNOWN"
-            else -> e.state.toString()
+            else -> entry.state.toString()
         }
     }
 

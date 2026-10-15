@@ -28,12 +28,6 @@ import org.isoron.uhabits.core.models.Frequency
 
 class SQLiteEntryList(val repository: EntryRepository) : EntryList() {
     var habitId: Long? = null
-
-    /**
-     * Whether the habit is measurable, read when an entry is written so an
-     * entry in the old single-value form is stored as state and amount.
-     */
-    var isNumerical: () -> Boolean = { false }
     var isLoaded = false
 
     private fun loadRecords() {
@@ -59,20 +53,19 @@ class SQLiteEntryList(val repository: EntryRepository) : EntryList() {
     override fun add(entry: Entry) {
         loadRecords()
         val habitId = habitId ?: throw IllegalStateException("habitId must be set")
-        val stored = entry.toStateForm(isNumerical())
 
-        repository.deleteByHabitIdAndTimestamp(habitId, stored.date.unixTime)
+        repository.deleteByHabitIdAndTimestamp(habitId, entry.date.unixTime)
 
         val data = EntryData(
             habitId = habitId,
-            timestamp = stored.date.unixTime,
-            state = stored.state,
-            amount = stored.amount,
-            notes = stored.notes
+            timestamp = entry.date.unixTime,
+            state = entry.state,
+            amount = entry.amount,
+            notes = entry.notes
         )
         repository.insert(data)
 
-        super.add(stored)
+        super.add(entry)
     }
 
     override fun getKnown(): List<Entry> {

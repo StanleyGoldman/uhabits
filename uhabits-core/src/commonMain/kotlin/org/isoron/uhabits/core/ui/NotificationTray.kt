@@ -110,17 +110,25 @@ open class NotificationTray(
     private inner class ShowNotificationTask(private val habit: Habit, data: NotificationData) :
         Task {
         var status = DayStatus.OPEN
+        var isLoggedToday = false
         private val date: LocalDate = data.date
         private val reminderTime: Long = data.reminderTime
 
         override suspend fun doInBackground() {
             status = habit.todayStatus()
+            isLoggedToday = habit.isEnteredToday()
         }
 
         override fun onPostExecute() {
             systemTray.log("Showing notification for habit=" + habit.id)
             if (status != DayStatus.OPEN) {
                 systemTray.log("Habit ${habit.id} already $status today. Skipping.")
+                return
+            }
+            // A measurable setting: a yes-or-no habit with anything entered
+            // today is never open, so it is already silent above.
+            if (habit.skipReminderIfLogged && isLoggedToday) {
+                systemTray.log("Habit ${habit.id} already logged today. Skipping.")
                 return
             }
             if (!habit.hasReminder()) {

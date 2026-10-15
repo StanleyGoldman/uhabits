@@ -21,12 +21,14 @@ package org.isoron.uhabits.core.ui
 import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.BaseUnitTest
+import org.isoron.uhabits.core.models.DayStatus
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Frequency
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitType
 import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.models.Reminder
+import org.isoron.uhabits.core.models.TargetPeriodMode
 import org.isoron.uhabits.core.models.WeekdayList
 import org.isoron.uhabits.core.preferences.MemoryStorage
 import org.isoron.uhabits.core.preferences.Preferences
@@ -85,6 +87,59 @@ class NotificationTrayTest : BaseUnitTest() {
         assertReminderShown(false, buildMeasurableHabit(NumericalHabitType.AT_MOST, 5.0).withAmountToday(6.0))
     }
 
+    @Test
+    fun weeklyAtLeast_silentOnceThePeriodIsMet() {
+        val habit = buildWeeklyHabit(NumericalHabitType.AT_LEAST, 10.0).withAmountYesterday(10.0)
+        assertReminderShown(false, habit)
+    }
+
+    @Test
+    fun weeklyAtMost_silentOnceThePeriodIsMissed() {
+        val habit = buildWeeklyHabit(NumericalHabitType.AT_MOST, 5.0).withAmountYesterday(6.0)
+        assertReminderShown(false, habit)
+    }
+
+    @Test
+    fun weeklyAtMost_firesWhileThePeriodIsOpen() {
+        val habit = buildWeeklyHabit(NumericalHabitType.AT_MOST, 5.0).withAmountYesterday(4.0)
+        assertReminderShown(true, habit)
+    }
+
+    @Test
+    fun skipIfLogged_silentOnceAnAmountIsLogged() {
+        val habit = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0)
+        habit.skipReminderIfLogged = true
+        assertReminderShown(false, habit.withAmountToday(4.0))
+    }
+
+    @Test
+    fun skipIfLogged_silentOnceASkipIsLogged() {
+        val habit = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0)
+        habit.frequency = Frequency.WEEKLY
+        habit.skipReminderIfLogged = true
+        habit.withEntryToday(Entry.SKIP)
+        assertEquals(DayStatus.OPEN, habit.todayStatus(), "setup")
+        assertReminderShown(false, habit)
+    }
+
+    @Test
+    fun skipIfLogged_firesWhenLoggedOnlyOnAnEarlierDay() {
+        val habit = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0)
+        habit.frequency = Frequency.WEEKLY
+        habit.skipReminderIfLogged = true
+        habit.originalEntries.add(Entry(getToday().minus(1), Entry.AMOUNT, 4000))
+        habit.recompute()
+        assertReminderShown(true, habit)
+    }
+
+    @Test
+    fun skipIfLoggedOff_firesWhileOpenAfterLogging() {
+        val habit = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0)
+        habit.frequency = Frequency.WEEKLY
+        assertEquals(false, habit.skipReminderIfLogged, "off by default")
+        assertReminderShown(true, habit.withAmountToday(4.0))
+    }
+
     private fun assertReminderShown(expected: Boolean, habit: Habit) {
         tray.show(habit, getToday(), 0)
         assertEquals(expected, systemTray.shown.contains(habit))
@@ -103,6 +158,19 @@ class NotificationTrayTest : BaseUnitTest() {
         habit.targetType = targetType
         habit.targetValue = target
         return habit
+    }
+
+    private fun buildWeeklyHabit(targetType: NumericalHabitType, target: Double): Habit {
+        val habit = buildMeasurableHabit(targetType, target)
+        habit.frequency = Frequency.WEEKLY
+        habit.targetPeriodMode = TargetPeriodMode.ROLLING
+        return habit
+    }
+
+    private fun Habit.withAmountYesterday(amount: Double): Habit {
+        originalEntries.add(Entry(getToday().minus(1), Entry.AMOUNT, (amount * 1000).toInt()))
+        recompute()
+        return this
     }
 
     private fun Habit.withEntryToday(value: Int): Habit {

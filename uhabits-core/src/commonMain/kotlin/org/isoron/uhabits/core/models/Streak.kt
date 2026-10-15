@@ -20,9 +20,16 @@ package org.isoron.uhabits.core.models
 
 import org.isoron.platform.time.LocalDate
 
+/**
+ * A run of met days. For a measurable habit judged by calendar week or month,
+ * [periodCount] counts the met periods in it, in [periodUnit]; otherwise
+ * [periodUnit] is null.
+ */
 data class Streak(
     val start: LocalDate,
-    val end: LocalDate
+    val end: LocalDate,
+    val periodCount: Int = 0,
+    val periodUnit: PeriodUnit? = null
 ) {
     fun compareLonger(other: Streak): Int {
         return if (length != other.length) {
@@ -39,3 +46,5 @@ data class Streak(
     val length: Int
         get() = start.daysUntil(end) + 1
 }
+
+enum class PeriodUnit { WEEK, MONTH }

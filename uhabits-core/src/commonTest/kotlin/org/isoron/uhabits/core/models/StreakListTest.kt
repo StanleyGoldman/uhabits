@@ -64,4 +64,134 @@ class StreakListTest : BaseUnitTest() {
         assertEquals(1, best.size)
         assertEquals(1, best[0].length)
     }
+
+    // Today is Sunday 2015-01-25; weeks run Sunday to Saturday.
+
+    @Test
+    fun testCalendarWeek_metPeriodsJoinWholeAndAnOpenPeriodIsPending() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0, Frequency.WEEKLY)
+        h.withAmountOn(LocalDate(2015, 1, 12), 10.0)
+        h.withAmountOn(LocalDate(2015, 1, 20), 10.0)
+        h.withAmountOn(today, 4.0)
+        assertEquals(
+            listOf(LocalDate(2015, 1, 11)..LocalDate(2015, 1, 24)),
+            h.streaks.getBest(5).map { it.start..it.end },
+            "the open week is left out"
+        )
+
+        h.withAmountOn(today, 10.0)
+        assertEquals(
+            listOf(LocalDate(2015, 1, 11)..LocalDate(2015, 1, 31)),
+            h.streaks.getBest(5).map { it.start..it.end },
+            "once met, the whole week joins"
+        )
+    }
+
+    @Test
+    fun testCalendarWeek_aShortPeriodEndsTheStreakAtThePreviousPeriod() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0, Frequency.WEEKLY)
+        h.withAmountOn(LocalDate(2015, 1, 5), 10.0)
+        h.withAmountOn(LocalDate(2015, 1, 12), 10.0)
+        h.withAmountOn(LocalDate(2015, 1, 20), 9.0)
+        h.withAmountOn(today, 10.0)
+        assertEquals(
+            listOf(
+                LocalDate(2015, 1, 25)..LocalDate(2015, 1, 31),
+                LocalDate(2015, 1, 4)..LocalDate(2015, 1, 17)
+            ),
+            h.streaks.getBest(5).map { it.start..it.end }
+        )
+    }
+
+    @Test
+    fun testCalendarWeek_anAllSkippedWeekBridgesTheStreak() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0, Frequency.WEEKLY)
+        h.withAmountOn(LocalDate(2015, 1, 5), 10.0)
+        for (day in 11..17) h.originalEntries.add(Entry(LocalDate(2015, 1, day), Entry.SKIP))
+        h.withAmountOn(LocalDate(2015, 1, 20), 10.0)
+        assertEquals(
+            listOf(LocalDate(2015, 1, 4)..LocalDate(2015, 1, 24)),
+            h.streaks.getBest(5).map { it.start..it.end }
+        )
+    }
+
+    @Test
+    fun testRollingWeek_eachDayJudgedByItsWindowUpToToday() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0, Frequency.WEEKLY)
+        h.targetPeriodMode = TargetPeriodMode.ROLLING
+        h.withAmountOn(LocalDate(2015, 1, 20), 5.0)
+        h.withAmountOn(LocalDate(2015, 1, 21), 5.0)
+        assertEquals(
+            listOf(LocalDate(2015, 1, 21)..today),
+            h.streaks.getBest(5).map { it.start..it.end },
+            "windows ending 2015-01-21..26 hold both amounts; the days after today are still to come"
+        )
+    }
+
+    @Test
+    fun testPeriods_countMetCalendarPeriods() {
+        val weekly = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0, Frequency.WEEKLY)
+        weekly.withAmountOn(LocalDate(2015, 1, 12), 10.0)
+        weekly.withAmountOn(LocalDate(2015, 1, 20), 10.0)
+        weekly.withAmountOn(today, 4.0)
+        assertEquals(
+            listOf(Pair(2, PeriodUnit.WEEK)),
+            weekly.streaks.getBest(5).map { Pair(it.periodCount, it.periodUnit) },
+            "the open week isn't counted"
+        )
+
+        val monthly = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0, Frequency(1, 30))
+        monthly.withAmountOn(LocalDate(2014, 12, 10), 10.0)
+        assertEquals(
+            listOf(Pair(1, PeriodUnit.MONTH)),
+            monthly.streaks.getBest(5).map { Pair(it.periodCount, it.periodUnit) }
+        )
+
+        weekly.targetPeriodMode = TargetPeriodMode.ROLLING
+        weekly.recompute()
+        assertEquals(
+            null,
+            weekly.streaks.getBest(5).map { it.periodUnit }.distinct().single(),
+            "rolling streaks have no periods"
+        )
+    }
+
+    @Test
+    fun testAtMost_followsAssumeNone() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_MOST, 2.0, Frequency.DAILY)
+        h.withAmountOn(LocalDate(2015, 1, 20), 1.0)
+        h.withAmountOn(LocalDate(2015, 1, 24), 3.0)
+        assertEquals(
+            listOf(LocalDate(2015, 1, 20)..LocalDate(2015, 1, 23)),
+            h.streaks.getBest(5).map { it.start..it.end },
+            "on: days with nothing entered are met"
+        )
+
+        h.assumeNone = false
+        h.recompute()
+        assertEquals(
+            listOf(LocalDate(2015, 1, 20)..LocalDate(2015, 1, 20)),
+            h.streaks.getBest(5).map { it.start..it.end },
+            "off: days with nothing entered are missed"
+        )
+    }
+
+    private fun buildMeasurableHabit(
+        targetType: NumericalHabitType,
+        target: Double,
+        frequency: Frequency
+    ): Habit {
+        val h = modelFactory.buildHabit()
+        h.type = HabitType.NUMERICAL
+        h.targetType = targetType
+        h.targetValue = target
+        h.frequency = frequency
+        h.recompute()
+        return h
+    }
+
+    private fun Habit.withAmountOn(date: LocalDate, amount: Double) {
+        originalEntries.add(Entry(date, Entry.AMOUNT, (amount * 1000).toInt()))
+        recompute()
+    }
 }

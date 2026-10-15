@@ -155,6 +155,27 @@ data class Habit(
     }
 
     /**
+     * The calendar week or month holding [date] for a weekly or monthly
+     * measurable habit in calendar mode, or null when each day is judged on
+     * its own window or by itself.
+     */
+    internal fun calendarPeriod(date: LocalDate): ClosedRange<LocalDate>? {
+        if (calendarPeriodUnit == null) return null
+        return targetPeriod(date)
+    }
+
+    /** The unit of [calendarPeriod], or null when the habit has none. */
+    internal val calendarPeriodUnit: PeriodUnit?
+        get() {
+            if (!isNumerical || targetPeriodMode != TargetPeriodMode.CALENDAR) return null
+            return when (frequency.denominator) {
+                7 -> PeriodUnit.WEEK
+                30, 31 -> PeriodUnit.MONTH
+                else -> null
+            }
+        }
+
+    /**
      * The verdict of a target period, or null when every day in it is
      * skipped. A skipped day drops out, and the target scales to the days
      * that count; days still to come count. Totals are compared as ×1000
@@ -207,14 +228,7 @@ data class Habit(
             today = today
         )
 
-        streaks.recompute(
-            computedEntries,
-            from,
-            to,
-            isNumerical,
-            targetValue,
-            targetType
-        )
+        streaks.recompute(this, from, to)
     }
 
     fun copyFrom(other: Habit) {

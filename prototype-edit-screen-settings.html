@@ -1,0 +1,248 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Never merge. Answers #52:
+  "Where do the three new per-habit settings go on the edit screen, what are they labelled, and how
+  does each show or hide as the target type and frequency change?"
+
+  Plan: three variants of the measurable habit edit screen (activity_edit_habit.xml), switchable via
+  ?variant=A|B|C and the floating bar at the bottom. The form is live: change the target type,
+  frequency or reminder and watch the new settings appear, hide or grey out. The side panel shows the
+  three stored columns (#42) that Save would write.
+
+  Assumption: the app is Android, so this file redraws the edit screen's boxes (FormOuterBox,
+  FormLabel, FormDropdown) in HTML instead of mounting variants on the real activity. The habit type
+  can't change on the edit screen (EditHabitActivity takes it from the intent), so only the target
+  type, frequency and reminder drive visibility. A hidden setting keeps its stored value (#46).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edit Screen Settings Prototype</title>
+<style>
+  :root { --page:#eceff1; --form:#fafafa; --card:#fff; --text:#212121; --muted:#757575; --line:#bdbdbd; --div:#e0e0e0; --accent:#e23673; --dis:#bdbdbd; }
+  body.dark { --page:#121212; --form:#1e1e1e; --card:#262626; --text:#f5f5f5; --muted:#9e9e9e; --line:#555; --div:#3a3a3a; --dis:#5f5f5f; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--page); color:var(--text); padding-bottom:90px; }
+  header { padding:12px 16px; border-bottom:1px solid var(--div); background:var(--card); }
+  h1 { font-size:16px; margin:0 0 8px; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0; }
+  .row b { font-weight:600; color:var(--muted); font-size:12px; min-width:90px; }
+  button.chip { border:1px solid var(--div); background:var(--card); color:var(--text); border-radius:14px; padding:4px 10px; cursor:pointer; font:inherit; font-size:13px; }
+  button.chip.on { background:#1e88e5; border-color:#1e88e5; color:#fff; }
+  main { display:flex; flex-wrap:wrap; gap:16px; padding:16px; align-items:flex-start; }
+  .phone { width:380px; max-width:100%; background:var(--form); border-radius:12px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.25); }
+  .toolbar { background:var(--accent); color:#fff; display:flex; align-items:center; padding:14px 16px; font-size:18px; gap:16px; }
+  .toolbar .save { margin-left:auto; border:1px solid #fff; border-radius:4px; padding:4px 12px; font-size:13px; font-weight:600; }
+  body.dark .toolbar { background:#333; }
+  .form { padding:8px 4px 16px; }
+  .hz { display:flex; }
+  .hz > .box { flex:1; }
+  .box { padding:4px 4px 8px; }
+  .inner { border:1px solid var(--line); border-radius:4px; position:relative; padding-top:6px; }
+  .label { position:absolute; top:-9px; left:8px; background:var(--form); padding:0 8px; font-size:12px; color:var(--muted); }
+  .field { padding:14px 16px 12px; display:flex; align-items:center; gap:8px; min-height:22px; }
+  .field.dd { cursor:pointer; }
+  .field.dd::after { content:"▾"; margin-left:auto; color:var(--muted); }
+  .field input[type=text] { border:0; background:transparent; color:var(--text); font:inherit; width:100%; outline:none; }
+  .divider { height:1px; background:var(--div); }
+  .sub { font-size:12px; color:var(--muted); display:block; }
+  .switchrow { padding:12px 16px; display:flex; align-items:center; gap:12px; cursor:pointer; }
+  .switchrow .txt { flex:1; }
+  .switchrow.disabled { cursor:default; color:var(--dis); }
+  .switchrow.disabled .sub { color:var(--dis); }
+  .sw { width:34px; height:14px; border-radius:7px; background:#9e9e9e; position:relative; flex:none; }
+  .sw::after { content:""; position:absolute; top:-3px; left:-2px; width:20px; height:20px; border-radius:50%; background:#f5f5f5; box-shadow:0 1px 3px rgba(0,0,0,.4); transition:left .12s; }
+  .sw.on { background:color-mix(in srgb, var(--accent) 50%, transparent); }
+  .sw.on::after { left:16px; background:var(--accent); }
+  .disabled .sw, .disabled .cb { opacity:.4; }
+  .cb { width:18px; height:18px; border:2px solid var(--muted); border-radius:2px; flex:none; display:flex; align-items:center; justify-content:center; font-size:13px; color:#fff; }
+  .cb.on { background:var(--accent); border-color:var(--accent); }
+  .seg { display:flex; margin:0 16px 12px; border:1px solid var(--accent); border-radius:4px; overflow:hidden; }
+  .seg div { flex:1; text-align:center; padding:6px 4px; cursor:pointer; font-size:13px; }
+  .seg div.on { background:var(--accent); color:#fff; }
+  .collapse { padding:14px 16px; display:flex; cursor:pointer; }
+  .collapse::after { content:attr(data-arrow); margin-left:auto; color:var(--muted); }
+  .new { outline:2px dashed #1e88e5; outline-offset:2px; border-radius:4px; }
+  .side { flex:1; min-width:300px; max-width:560px; display:flex; flex-direction:column; gap:12px; }
+  .card { background:var(--card); border-radius:4px; box-shadow:0 1px 3px rgba(0,0,0,.2); padding:12px; }
+  .card h2 { font-size:14px; margin:0 0 8px; color:#1e88e5; font-weight:600; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  td, th { text-align:left; padding:3px 6px; border-bottom:1px solid var(--div); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  code { font-size:12px; }
+  .note { color:var(--muted); font-size:13px; }
+  .note li { margin:3px 0; }
+  .menu { position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:8; }
+  .menu > div { background:var(--card); border-radius:4px; min-width:260px; padding:8px 0; box-shadow:0 6px 20px rgba(0,0,0,.4); }
+  .menu .item { padding:12px 24px; cursor:pointer; }
+  .menu .item:hover { background:var(--div); }
+  .menu .item .sub { margin-top:2px; }
+  #switcher { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#111; color:#fff; border-radius:24px;
+    padding:6px 8px; display:flex; gap:8px; align-items:center; box-shadow:0 4px 14px rgba(0,0,0,.45); font-size:13px; z-index:9; }
+  #switcher button { background:#333; color:#fff; border:0; border-radius:50%; width:32px; height:32px; cursor:pointer; font-size:16px; }
+  #switcher span { min-width:260px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PROTOTYPE · edit-screen placement and labels for the new habit settings (#52) · throwaway</h1>
+  <div class="row"><b>Start from</b><span id="presets"></span></div>
+  <div class="row"><b>New settings</b><span id="marks"></span></div>
+  <div class="row"><b>Theme</b><span id="themes"></span></div>
+</header>
+<main>
+  <div class="phone">
+    <div class="toolbar"><span>←</span><span id="title">Edit habit</span><span class="save">SAVE</span></div>
+    <div class="form" id="form"></div>
+  </div>
+  <div class="side">
+    <div class="card"><h2>Variant</h2><div id="about" class="note"></div></div>
+    <div class="card"><h2>What Save writes (Habits table, #42)</h2><table id="state"></table></div>
+    <div class="card"><h2>Fixed by earlier decisions</h2><ul class="note">
+      <li>Target period mode: weekly/monthly measurable habits only; calendar (0) by default, rolling (1) offered as "per 7 days / per 30 days" (#31 Q1).</li>
+      <li>"Assume none": "at most" habits only; on for existing and new habits (#4, #46). Switching to "at least" keeps the stored value (#46).</li>
+      <li>"Skip if I've logged anything today": measurable habits only, off by default, resets daily (#31 Q5).</li>
+      <li>All three are stored on every habit and ignored where they don't apply (#42 Q6).</li>
+    </ul></div>
+  </div>
+</main>
+<div id="switcher"><button id="prev">←</button><span id="vlabel"></span><button id="next">→</button></div>
+<script>
+const VARIANTS = {
+  A: { name: 'Folded into existing pickers', about: `
+    <p>No new boxes. Each setting lives inside the control it depends on.</p>
+    <ul><li><b>Period mode</b> becomes extra Frequency choices: Every week, Every 7 days, Every month, Every 30 days (the wording #31 settled on). Nothing to hide: the choice <i>is</i> the setting.</li>
+    <li><b>Assume none</b> is a switch under a divider in the Target Type box, shown only for "At most".</li>
+    <li><b>Skip if logged</b> is a checkbox under the reminder days in the Reminder box, shown only when a reminder is set (it means nothing without one).</li></ul>` },
+  B: { name: 'Own box beside each parent', about: `
+    <p>Each setting gets its own labelled box right after the field that controls it, and is hidden when it doesn't apply.</p>
+    <ul><li><b>Target period</b>: a segmented "Calendar week | Any 7 days" box under the target row, for weekly/monthly only.</li>
+    <li><b>Days with nothing entered</b>: a dropdown box under Target Type, for "At most" only.</li>
+    <li><b>Skip if logged</b>: a checkbox row always in the Reminder box, greyed while the reminder is off.</li></ul>` },
+  C: { name: 'One "Judging" box at the bottom', about: `
+    <p>The three settings sit together in one collapsible box above Notes, so the familiar form above stays exactly as it is today.</p>
+    <ul><li>Rows that don't apply stay visible but greyed, with the reason as the subtitle, so users learn the settings exist.</li>
+    <li>Collapsed by default; the header summarises the current values.</li></ul>` },
+};
+const KEYS = Object.keys(VARIANTS);
+const PRESETS = {
+  'New habit': { title:'Create habit', name:'', unit:'', target:'', freq:7, type:'least', mode:0, assume:1, skip:0, rem:false },
+  'Existing: run 10 km a week': { title:'Edit habit', name:'Run', unit:'km', target:'10', freq:7, type:'least', mode:0, assume:1, skip:0, rem:true },
+  'Existing: at most 4 coffees a week': { title:'Edit habit', name:'Coffee', unit:'cups', target:'4', freq:7, type:'most', mode:0, assume:1, skip:0, rem:false },
+  'Existing: water 2 L a day': { title:'Edit habit', name:'Water', unit:'L', target:'2', freq:1, type:'least', mode:0, assume:1, skip:0, rem:true },
+};
+let s = {}, preset = Object.keys(PRESETS)[0], marks = true, dark = false, open = false;
+const q = new URLSearchParams(location.search);
+let variant = KEYS.includes(q.get('variant')) ? q.get('variant') : 'A';
+function load(p) { preset = p; s = { ...PRESETS[p] }; open = false; render(); }
+
+const periodic = () => s.freq !== 1;
+const freqText = () => ({1:'Every day', 7:'Every week', 30:'Every month'})[s.freq];
+const unitWord = () => s.freq === 7 ? 'week' : 'month';
+const rollWord = () => s.freq === 7 ? '7 days' : '30 days';
+const N = c => marks ? `class="${c} new"` : `class="${c}"`;
+
+function menu(items, pick) {
+  const m = document.createElement('div'); m.className = 'menu';
+  m.innerHTML = `<div>${items.map((it,i)=>`<div class="item" data-i="${i}">${it[0]}${it[1]?`<span class="sub">${it[1]}</span>`:''}</div>`).join('')}</div>`;
+  m.onclick = e => { const it = e.target.closest('.item'); if (it) pick(+it.dataset.i); m.remove(); render(); };
+  document.body.appendChild(m);
+}
+function box(label, body, cls='box') { return `<div class="${cls}"><div class="inner"><span class="label">${label}</span>${body}</div></div>`; }
+function sw(on) { return `<span class="sw ${on?'on':''}"></span>`; }
+function cb(on) { return `<span class="cb ${on?'on':''}">${on?'✓':''}</span>`; }
+
+const assumeLabel = 'Count days with nothing entered as 0';
+const assumeSub = () => s.assume ? 'Unrecorded days are under the limit (met)' : 'Unrecorded days count as missed';
+const skipLabel = "Skip if I've logged anything today";
+
+function common(afterTarget='', afterType='', reminderExtra='', beforeNotes='', freqClick='freqDialog', afterTypeBox='') {
+  const rem = s.rem ? `<div class="field dd" data-act="rem">8:00 AM</div><div class="divider"></div><div class="field dd">Every day</div>` : `<div class="field dd" data-act="rem">Off</div>`;
+  return `
+  <div class="hz">${box('Name', `<div class="field"><input type="text" value="${s.name}" placeholder="e.g. Run"></div>`)}
+    <div class="box" style="flex:none;width:80px"><div class="inner"><span class="label">Color</span><div class="field"><span style="display:block;width:100%;height:22px;background:var(--accent);border-radius:2px"></span></div></div></div></div>
+  ${box('Question', `<div class="field"><input type="text" placeholder="e.g. How many km did you run today?"></div>`)}
+  ${box('Unit', `<div class="field"><input type="text" value="${s.unit}" placeholder="e.g. km"></div>`)}
+  <div class="hz">${box('Target', `<div class="field"><input type="text" value="${s.target}" placeholder="e.g. 10"></div>`)}
+    ${box('Frequency', `<div class="field dd" data-act="${freqClick}">${freqClick==='freqA' ? freqTextA() : freqText()}</div>`)}</div>
+  ${afterTarget}
+  ${box('Target Type', `<div class="field dd" data-act="type">${s.type==='most'?'At most':'At least'}</div>${afterType}`)}
+  ${afterTypeBox}
+  ${box('Reminder', rem + reminderExtra)}
+  ${beforeNotes}
+  ${box('Notes', `<div class="field"><input type="text" placeholder="(Optional)"></div>`)}`;
+}
+
+// Variant A: the period mode is part of the frequency choice
+function freqTextA() { return s.freq===1 ? 'Every day' : (s.mode ? `Every ${rollWord()}` : `Every ${unitWord()}`); }
+function A() {
+  const assume = s.type==='most' ? `<div class="divider"></div><div ${N('switchrow')} data-act="assume"><span class="txt">${assumeLabel}<span class="sub">${assumeSub()}</span></span>${sw(s.assume)}</div>` : '';
+  const skip = s.rem ? `<div class="divider"></div><div ${N('switchrow')} data-act="skip">${cb(s.skip)}<span class="txt">${skipLabel}</span></div>` : '';
+  return common('', assume, skip, '', 'freqA');
+}
+// Variant B: own box after each parent
+function B() {
+  const period = periodic() ? box('Target period', `<div class="seg" style="margin-top:12px">
+      <div data-act="mode0" class="${s.mode?'':'on'}">Calendar ${unitWord()}</div><div data-act="mode1" class="${s.mode?'on':''}">Any ${rollWord()}</div></div>
+      <span class="sub" style="padding:0 16px 10px">${s.mode ? `Judged over the last ${rollWord()}, every day` : (s.freq===7 ? 'Judged Mon–Sun (first day of week setting)' : 'Judged per calendar month')}</span>`, marks?'box new':'box') : '';
+  const assume = s.type==='most' ? box('Days with nothing entered', `<div class="field dd" data-act="assumeDd">${s.assume?'Count as 0 (under the limit)':'Count as missed'}</div>`, marks?'box new':'box') : '';
+  const skip = `<div class="divider"></div><div ${N('switchrow'+(s.rem?'':' disabled'))} data-act="${s.rem?'skip':''}">${cb(s.skip)}<span class="txt">${skipLabel}</span></div>`;
+  return common(period, '', skip, '', 'freqDialog', assume);
+}
+// Variant C: one collapsible box above Notes
+function C() {
+  const rows = [
+    { act: periodic()?'mode':'', on: !!s.mode, t: periodic() ? `Judge over any ${rollWord()}` : 'Judge over any 7 / 30 days',
+      sub: periodic() ? (s.mode ? `Rolling: the last ${rollWord()}, every day` : `Off: each calendar ${unitWord()}`) : 'Only for weekly or monthly targets' },
+    { act: s.type==='most'?'assume':'', on: !!s.assume, t: assumeLabel, sub: s.type==='most' ? assumeSub() : 'Only for "At most" targets' },
+    { act: s.rem?'skip':'', on: !!s.skip, t: skipLabel, sub: s.rem ? 'No reminder on days with any entry' : 'Only when a reminder is set' },
+  ];
+  const summary = [periodic() ? (s.mode?`any ${rollWord()}`:`calendar ${unitWord()}`) : null, s.type==='most' ? (s.assume?'empty = 0':'empty = missed') : null, s.rem && s.skip ? 'skip if logged' : null].filter(Boolean).join(' · ') || 'defaults';
+  const body = `<div class="collapse" data-act="toggle" data-arrow="${open?'▴':'▾'}"><span>${summary}</span></div>` + (open ? rows.map(r =>
+    `<div class="divider"></div><div class="switchrow ${r.act?'':'disabled'}" data-act="${r.act}"><span class="txt">${r.t}<span class="sub">${r.sub}</span></span>${sw(r.on)}</div>`).join('') : '');
+  return common('', '', '', box('Judging', body, marks?'box new':'box'));
+}
+
+function render() {
+  document.body.classList.toggle('dark', dark);
+  document.getElementById('title').textContent = s.title;
+  document.getElementById('form').innerHTML = ({A, B, C})[variant]();
+  document.getElementById('about').innerHTML = VARIANTS[variant].about;
+  document.getElementById('vlabel').textContent = `${variant} (${VARIANTS[variant].name})`;
+  const applies = [periodic(), s.type==='most', true];
+  const rows = [['target_period_mode', s.mode, s.mode?'1 rolling':'0 calendar', applies[0]], ['assume_none', s.assume, s.assume?'1 on':'0 off', applies[1]], ['skip_reminder_if_logged', s.skip, s.skip?'1 on':'0 off', applies[2]]];
+  document.getElementById('state').innerHTML = `<tr><th>Column</th><th>Value</th><th>Applies now?</th></tr>` + rows.map(r => `<tr><td><code>${r[0]}</code></td><td>${r[2]}</td><td>${r[3] ? 'yes' : 'no, kept as stored'}</td></tr>`).join('') +
+    `<tr><td><code>freq</code> / <code>target_type</code></td><td>${freqText()} / ${s.type==='most'?'at most':'at least'}</td><td></td></tr>`;
+  chips('presets', Object.keys(PRESETS), preset, load);
+  chips('marks', ['Outline them', 'Plain'], marks?'Outline them':'Plain', v => { marks = v==='Outline them'; render(); });
+  chips('themes', ['Light', 'Dark'], dark?'Dark':'Light', v => { dark = v==='Dark'; render(); });
+}
+function chips(id, opts, cur, fn) {
+  const el = document.getElementById(id); el.innerHTML = '';
+  for (const o of opts) { const b = document.createElement('button'); b.className = 'chip' + (o===cur?' on':''); b.textContent = o; b.onclick = () => fn(o); el.appendChild(b); }
+}
+document.getElementById('form').addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t || !t.dataset.act) return;
+  const a = t.dataset.act;
+  if (a==='freqDialog') return menu([['Every day'],['Every week'],['Every month']], i => s.freq = [1,7,30][i]);
+  if (a==='freqA') return menu([['Every day'],['Every week','Monday to Sunday'],['Every 7 days','Any 7 days in a row'],['Every month','1st to end of month'],['Every 30 days','Any 30 days in a row']],
+    i => { s.freq = [1,7,7,30,30][i]; if (i) s.mode = [0,0,1,0,1][i]; });
+  if (a==='type') return menu([['At least'],['At most']], i => s.type = i ? 'most' : 'least');
+  if (a==='assumeDd') return menu([['Count as 0','Under the limit, so the day is met'],['Count as missed','No entry, no credit']], i => s.assume = i ? 0 : 1);
+  if (a==='rem') { s.rem = !s.rem; }
+  if (a==='assume') s.assume ^= 1;
+  if (a==='skip') s.skip ^= 1;
+  if (a==='mode') s.mode ^= 1;
+  if (a==='mode0') s.mode = 0;
+  if (a==='mode1') s.mode = 1;
+  if (a==='toggle') open = !open;
+  render();
+});
+function go(d) { variant = KEYS[(KEYS.indexOf(variant)+d+KEYS.length)%KEYS.length]; const u = new URL(location); u.searchParams.set('variant', variant); history.replaceState(null, '', u); render(); }
+document.getElementById('prev').onclick = () => go(-1);
+document.getElementById('next').onclick = () => go(1);
+document.addEventListener('keydown', e => { if (e.target.closest('input,textarea,[contenteditable]')) return; if (e.key==='ArrowLeft') go(-1); if (e.key==='ArrowRight') go(1); });
+load(preset);
+</script>
+</body>
+</html>

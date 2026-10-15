@@ -33,46 +33,42 @@ class StreakList {
         }.toList()
     }
 
+    /**
+     * Rebuilds the streaks from the habit's verdicts between [from] and [to].
+     * A calendar week or month is judged as a whole: once met, all its days
+     * join the streak. An open day or period is pending: only the current
+     * one or those to come can be open, so the streak ends just before it
+     * until it is met. A period of only skips bridges a running streak: its
+     * days join, but it isn't a met period. A measurable habit's streaks stop
+     * at the day or period holding [today].
+     */
     @Synchronized
-    fun recompute(
-        computedEntries: EntryList,
-        from: LocalDate,
-        to: LocalDate,
-        isNumerical: Boolean,
-        targetValue: Double,
-        targetType: NumericalHabitType
-    ) {
+    fun recompute(habit: Habit, from: LocalDate, to: LocalDate, today: LocalDate) {
         list.clear()
-        val dates = computedEntries
-            .getByInterval(from, to)
-            .filter {
-                val value = it.value
-                if (isNumerical) {
-                    when (targetType) {
-                        NumericalHabitType.AT_LEAST -> value / 1000.0 >= targetValue
-                        NumericalHabitType.AT_MOST -> value != Entry.UNKNOWN && value / 1000.0 <= targetValue
-                    }
-                } else {
-                    value > 0
-                }
-            }
-            .map { it.date }
-            .toTypedArray()
-
-        if (dates.isEmpty()) return
-
-        var begin = dates[0]
-        var end = dates[0]
-        for (i in 1 until dates.size) {
-            val current = dates[i]
-            if (current == begin.minus(1)) {
-                begin = current
-            } else {
-                list.add(Streak(begin, end))
-                begin = current
-                end = current
-            }
+        val unit = habit.calendarPeriodUnit
+        var begin: LocalDate? = null
+        var end: LocalDate? = null
+        var periodCount = 0
+        fun endStreak() {
+            if (begin != null) list.add(Streak(begin!!, end!!, periodCount, unit))
+            begin = null
+            periodCount = 0
         }
-        list.add(Streak(begin, end))
+        val last = if (habit.isNumerical) minOf(to, today) else to
+        var date = from
+        while (date <= last) {
+            val span = habit.calendarPeriod(date) ?: date..date
+            when (habit.statusOn(date)) {
+                DayStatus.MET -> {
+                    if (begin == null) begin = span.start
+                    end = span.endInclusive
+                    if (unit != null) periodCount++
+                }
+                null -> if (begin != null) end = span.endInclusive
+                else -> endStreak()
+            }
+            date = span.endInclusive.plus(1)
+        }
+        endStreak()
     }
 }

@@ -20,7 +20,10 @@ package org.isoron.uhabits.activities.common.views
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
+import org.isoron.platform.time.LocalDate
 import org.isoron.uhabits.BaseViewTest
+import org.isoron.uhabits.core.models.PeriodUnit
+import org.isoron.uhabits.core.models.Streak
 import org.isoron.uhabits.utils.toFixedAndroidColor
 import org.junit.Before
 import org.junit.Test
@@ -61,6 +64,19 @@ class StreakChartTest : BaseViewTest() {
     fun testRender_withTransparentBackground() {
         view.setIsBackgroundTransparent(true)
         assertRenders(view, BASE_PATH + "renderTransparent.png")
+    }
+
+    @Test
+    @Throws(Throwable::class)
+    fun testRender_withPeriods() {
+        view.setStreaks(
+            listOf(
+                Streak(LocalDate(2015, 1, 4), LocalDate(2015, 2, 7), 5, PeriodUnit.WEEK),
+                Streak(LocalDate(2015, 2, 15), LocalDate(2015, 2, 21), 1, PeriodUnit.WEEK),
+                Streak(LocalDate(2015, 3, 1), LocalDate(2015, 4, 30), 2, PeriodUnit.MONTH)
+            )
+        )
+        assertRenders(view, BASE_PATH + "renderWithPeriods.png")
     }
 
     companion object {

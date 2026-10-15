@@ -29,6 +29,7 @@ import android.view.ViewGroup
 import org.isoron.platform.time.JavaLocalDateFormatter
 import org.isoron.platform.time.getToday
 import org.isoron.uhabits.R
+import org.isoron.uhabits.core.models.PeriodUnit
 import org.isoron.uhabits.core.models.Streak
 import org.isoron.uhabits.utils.InterfaceUtils.dpToPixels
 import org.isoron.uhabits.utils.InterfaceUtils.getDimension
@@ -151,7 +152,8 @@ class StreakChart : View {
         var availableWidth = internalWidth - 2 * maxLabelWidth
         if (shouldShowLabels) availableWidth -= 2 * textMargin
         var barWidth = percentage * availableWidth
-        val minBarWidth = paint!!.measureText(streak.length.toLong().toString()) + em
+        val label = barLabel(streak)
+        val minBarWidth = paint!!.measureText(label) + em
         barWidth = max(barWidth, minBarWidth)
         val gap = (internalWidth - barWidth) / 2
         val paddingTopBottom = baseSize * 0.05f
@@ -170,7 +172,7 @@ class StreakChart : View {
         paint!!.color = percentageToTextColor(percentage)
         paint!!.textAlign = Paint.Align.CENTER
         canvas.drawText(
-            streak.length.toLong().toString(),
+            label,
             rect.centerX(),
             yOffset,
             paint!!
@@ -185,6 +187,20 @@ class StreakChart : View {
             paint!!.textAlign = Paint.Align.LEFT
             canvas.drawText(endLabel, internalWidth - gap + textMargin, yOffset, paint!!)
         }
+    }
+
+    /**
+     * The streak's length in days, followed by its met weeks or months when
+     * the habit is judged by calendar period: "35 · 5 weeks".
+     */
+    private fun barLabel(streak: Streak): String {
+        val plural = when (streak.periodUnit) {
+            PeriodUnit.WEEK -> R.plurals.streak_weeks
+            PeriodUnit.MONTH -> R.plurals.streak_months
+            null -> return streak.length.toString()
+        }
+        val periods = resources.getQuantityString(plural, streak.periodCount, streak.periodCount)
+        return "${streak.length} · $periods"
     }
 
     private fun init() {

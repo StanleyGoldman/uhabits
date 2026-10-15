@@ -23,16 +23,32 @@ import org.isoron.platform.time.TruncateField
 import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.PaletteColor
+import org.isoron.uhabits.core.models.TargetPeriodMode
 import org.isoron.uhabits.core.models.countSkippedDays
 import org.isoron.uhabits.core.models.groupedSum
 import org.isoron.uhabits.core.ui.views.Theme
 import kotlin.math.max
 
+/** The period a row of target progress totals, which names the row. */
+enum class TargetInterval {
+    TODAY,
+    WEEK,
+
+    /** The rolling window of a habit with an "Every 7 days" target. */
+    LAST_7_DAYS,
+    MONTH,
+
+    /** The rolling window of a habit with an "Every 30 days" target. */
+    LAST_30_DAYS,
+    QUARTER,
+    YEAR
+}
+
 data class TargetCardState(
     val color: PaletteColor,
     val values: List<Double> = listOf(),
     val targets: List<Double> = listOf(),
-    val intervals: List<Int> = listOf(),
+    val intervals: List<TargetInterval> = listOf(),
     val theme: Theme
 )
 
@@ -148,12 +164,24 @@ class TargetCardPresenter {
             targets.add(targetThisQuarter)
             targets.add(targetThisYear)
 
-            val intervals = mutableListOf<Int>()
-            if (habit.frequency.denominator <= 1) intervals.add(1)
-            if (habit.frequency.denominator <= 7) intervals.add(7)
-            intervals.add(30)
-            intervals.add(91)
-            intervals.add(365)
+            val intervals = mutableListOf<TargetInterval>()
+            if (habit.frequency.denominator <= 1) intervals.add(TargetInterval.TODAY)
+            if (habit.frequency.denominator <= 7) intervals.add(TargetInterval.WEEK)
+            intervals.add(TargetInterval.MONTH)
+            intervals.add(TargetInterval.QUARTER)
+            intervals.add(TargetInterval.YEAR)
+
+            if (habit.isJudgedByPeriod && habit.targetPeriodMode == TargetPeriodMode.ROLLING) {
+                val (row, rollingRow) = when (denominator) {
+                    7 -> TargetInterval.WEEK to TargetInterval.LAST_7_DAYS
+                    else -> TargetInterval.MONTH to TargetInterval.LAST_30_DAYS
+                }
+                val index = intervals.indexOf(row)
+                val progress = habit.progressIn(habit.targetPeriod(today)!!)
+                intervals[index] = rollingRow
+                values[index] = progress.total
+                targets[index] = progress.target
+            }
 
             return TargetCardState(
                 color = habit.color,

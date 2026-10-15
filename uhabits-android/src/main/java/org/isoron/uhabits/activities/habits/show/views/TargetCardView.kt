@@ -26,6 +26,7 @@ import android.widget.LinearLayout
 import org.isoron.platform.gui.toInt
 import org.isoron.uhabits.R
 import org.isoron.uhabits.core.ui.screens.habits.show.views.TargetCardState
+import org.isoron.uhabits.core.ui.screens.habits.show.views.TargetInterval
 import org.isoron.uhabits.databinding.ShowHabitTargetBinding
 
 class TargetCardView(context: Context, attrs: AttributeSet) : LinearLayout(context, attrs) {
@@ -41,12 +42,14 @@ class TargetCardView(context: Context, attrs: AttributeSet) : LinearLayout(conte
     }
 
     companion object {
-        fun intervalToLabel(resources: Resources, interval: Int) = when (interval) {
-            1 -> resources.getString(R.string.today)
-            7 -> resources.getString(R.string.week)
-            30 -> resources.getString(R.string.month)
-            91 -> resources.getString(R.string.quarter)
-            else -> resources.getString(R.string.year)
+        fun intervalToLabel(resources: Resources, interval: TargetInterval) = when (interval) {
+            TargetInterval.TODAY -> resources.getString(R.string.today)
+            TargetInterval.WEEK -> resources.getString(R.string.week)
+            TargetInterval.LAST_7_DAYS -> resources.getString(R.string.last_7_days)
+            TargetInterval.MONTH -> resources.getString(R.string.month)
+            TargetInterval.LAST_30_DAYS -> resources.getString(R.string.last_30_days)
+            TargetInterval.QUARTER -> resources.getString(R.string.quarter)
+            TargetInterval.YEAR -> resources.getString(R.string.year)
         }
     }
 }

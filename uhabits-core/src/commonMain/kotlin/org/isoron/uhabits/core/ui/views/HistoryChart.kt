@@ -31,6 +31,7 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.round
+import kotlin.math.sqrt
 
 interface OnDateClickedListener {
     fun onDateShortPress(date: LocalDate) {}
@@ -55,7 +56,19 @@ class HistoryChart(
         OFF,
         GREY,
         DIMMED,
-        HATCHED
+        HATCHED,
+
+        /** GREY with a red corner: the day an "at most" period went over its cap. */
+        GREY_OVER_CAP,
+
+        /** HATCHED in dimmed grey: skipped, in a missed period. */
+        GREY_HATCHED,
+
+        /** DIMMED, outlined in the habit colour: entered, in a period still open. */
+        DIMMED_OUTLINED,
+
+        /** OFF, outlined in the habit colour: nothing entered, in a period still open. */
+        OFF_OUTLINED
     }
 
     var squareSpacing = 1.0
@@ -213,13 +226,16 @@ class HistoryChart(
             Square.ON -> {
                 color
             }
-            Square.OFF -> {
+            Square.OFF, Square.OFF_OUTLINED -> {
                 theme.lowContrastTextColor
             }
-            Square.GREY -> {
+            Square.GREY, Square.GREY_OVER_CAP -> {
                 theme.mediumContrastTextColor
             }
-            Square.DIMMED, Square.HATCHED -> {
+            Square.GREY_HATCHED -> {
+                theme.mediumContrastTextColor.blendWith(theme.cardBackgroundColor, 0.5)
+            }
+            Square.DIMMED, Square.HATCHED, Square.DIMMED_OUTLINED -> {
                 color.blendWith(theme.cardBackgroundColor, 0.5)
             }
         }
@@ -227,7 +243,12 @@ class HistoryChart(
         canvas.setColor(squareColor)
         canvas.fillRoundRect(x, y, width, height, width * 0.15)
 
-        if (value == Square.HATCHED) {
+        if (value == Square.DIMMED_OUTLINED || value == Square.OFF_OUTLINED) {
+            canvas.setColor(color)
+            fillOutline(canvas, x, y, width, height, width * 0.15, max(1.5, width * 0.08))
+        }
+
+        if (value == Square.HATCHED || value == Square.GREY_HATCHED) {
             canvas.setStrokeWidth(0.75)
             canvas.setColor(theme.cardBackgroundColor)
             var k = width / 10
@@ -240,6 +261,19 @@ class HistoryChart(
                     y + height - k
                 )
                 k += width / 5
+            }
+        }
+
+        if (value == Square.GREY_OVER_CAP) {
+            // A triangle in the top-left corner, following the rounded
+            // corner. The canvas has no paths, so it is filled row by row.
+            canvas.setColor(OVER_CAP_COLOR)
+            val side = width * 0.42
+            var row = 0.0
+            while (row < side) {
+                val inset = roundedInset(row, height, width * 0.15)
+                canvas.fillRect(x + inset, y + row, side - row - inset, ROW_HEIGHT)
+                row += ROW_HEIGHT
             }
         }
 
@@ -257,11 +291,58 @@ class HistoryChart(
 
         if (hasNotes) {
             circleColor = when (value) {
-                Square.ON, Square.GREY -> theme.lowContrastTextColor
+                Square.ON, Square.GREY, Square.GREY_OVER_CAP -> theme.lowContrastTextColor
                 else -> color
             }
             canvas.setColor(circleColor)
             canvas.fillCircle(x + width - width / 5, y + width / 5, width / 12)
         }
+    }
+
+    /**
+     * Fills the band between a rounded square and the same square inset by
+     * [stroke], row by row. Covering a filled square with a smaller one would
+     * be simpler, but the widget's see-through squares would show the
+     * colour beneath.
+     */
+    private fun fillOutline(
+        canvas: Canvas,
+        x: Double,
+        y: Double,
+        width: Double,
+        height: Double,
+        radius: Double,
+        stroke: Double
+    ) {
+        val innerHeight = height - 2 * stroke
+        val innerRadius = max(0.0, radius - stroke)
+        var row = 0.0
+        while (row < height) {
+            val left = x + roundedInset(row, height, radius)
+            val right = x + width - roundedInset(row, height, radius)
+            val innerRow = row - stroke
+            if (innerRow < 0 || innerRow >= innerHeight) {
+                canvas.fillRect(left, y + row, right - left, ROW_HEIGHT)
+            } else {
+                val inner = stroke + roundedInset(innerRow, innerHeight, innerRadius)
+                canvas.fillRect(left, y + row, x + inner - left, ROW_HEIGHT)
+                canvas.fillRect(x + width - inner, y + row, right - (x + width - inner), ROW_HEIGHT)
+            }
+            row += ROW_HEIGHT
+        }
+    }
+
+    /** How far a rounded square's edge sits inside its bounding box on a row. */
+    private fun roundedInset(row: Double, height: Double, radius: Double): Double {
+        val dy = max(0.0, max(radius - row, row - (height - radius)))
+        return radius - sqrt(max(0.0, radius * radius - dy * dy))
+    }
+
+    companion object {
+        /** The red of the corner on the day an "at most" period went over its cap. */
+        private val OVER_CAP_COLOR = Color(0xE53935)
+
+        /** The height of the rows outlines and corners are filled with. */
+        private const val ROW_HEIGHT = 0.5
     }
 }

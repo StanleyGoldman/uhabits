@@ -24,17 +24,26 @@ import dev.mokkery.resetCalls
 import dev.mokkery.verify
 import dev.mokkery.verifyNoMoreCalls
 import kotlinx.coroutines.test.runTest
+import org.isoron.platform.gui.Color
 import org.isoron.platform.gui.assertRenders
+import org.isoron.platform.io.createTestCanvas
 import org.isoron.platform.io.createTestDateFormatter
+import org.isoron.platform.io.ensureFontsLoaded
 import org.isoron.platform.time.DayOfWeek
 import org.isoron.platform.time.DayOfWeek.SUNDAY
 import org.isoron.platform.time.LocalDate
 import org.isoron.uhabits.core.models.PaletteColor
 import org.isoron.uhabits.core.ui.views.HistoryChart.Square.DIMMED
+import org.isoron.uhabits.core.ui.views.HistoryChart.Square.DIMMED_OUTLINED
+import org.isoron.uhabits.core.ui.views.HistoryChart.Square.GREY
+import org.isoron.uhabits.core.ui.views.HistoryChart.Square.GREY_HATCHED
+import org.isoron.uhabits.core.ui.views.HistoryChart.Square.GREY_OVER_CAP
 import org.isoron.uhabits.core.ui.views.HistoryChart.Square.HATCHED
 import org.isoron.uhabits.core.ui.views.HistoryChart.Square.OFF
+import org.isoron.uhabits.core.ui.views.HistoryChart.Square.OFF_OUTLINED
 import org.isoron.uhabits.core.ui.views.HistoryChart.Square.ON
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class HistoryChartTest {
     val base = "views/HistoryChart"
@@ -171,5 +180,66 @@ class HistoryChartTest {
     fun testDrawOffset() = runTest {
         view.dataOffset = 2
         assertRenders(400, 200, "$base/scroll.png", view)
+    }
+
+    /** A view showing every square a weekly or monthly measurable habit can draw. */
+    private fun periodSquaresView() = HistoryChart(
+        today = LocalDate(2015, 1, 25),
+        paletteColor = PaletteColor(7),
+        theme = LightTheme(),
+        dateFormatter = createTestDateFormatter(),
+        firstWeekday = SUNDAY,
+        defaultSquare = OFF,
+        series = listOf(
+            OFF_OUTLINED, // today
+            OFF, GREY_HATCHED, OFF, GREY, GREY_OVER_CAP, GREY, GREY,
+            DIMMED, ON, DIMMED, HATCHED, ON, DIMMED, ON,
+            OFF_OUTLINED, DIMMED_OUTLINED, HATCHED, DIMMED_OUTLINED, OFF_OUTLINED, OFF_OUTLINED, DIMMED_OUTLINED
+        ),
+        notesIndicators = MutableList(22) { index: Int -> index % 4 == 0 }
+    )
+
+    @Test
+    fun testDrawPeriodSquares() = runTest {
+        assertRenders(260, 400, "$base/periodSquares.png", periodSquaresView())
+    }
+
+    @Test
+    fun testDrawPeriodSquaresDarkTheme() = runTest {
+        val view = periodSquaresView()
+        view.theme = DarkTheme()
+        assertRenders(260, 400, "$base/periodSquaresDark.png", view)
+    }
+
+    @Test
+    fun testDrawPeriodSquaresWidgetTheme() = runTest {
+        val view = periodSquaresView()
+        view.theme = WidgetTheme()
+        assertRenders(260, 400, "$base/periodSquaresWidget.png", view)
+    }
+
+    @Test
+    fun testDrawOverCap_redCornerTopLeft_greyElsewhere() = runTest {
+        // One week column, Sunday 18 to Saturday 24 January.
+        val view = HistoryChart(
+            today = LocalDate(2015, 1, 24),
+            paletteColor = PaletteColor(7),
+            theme = LightTheme(),
+            dateFormatter = createTestDateFormatter(),
+            firstWeekday = SUNDAY,
+            defaultSquare = OFF,
+            series = List(7) { GREY_OVER_CAP },
+            notesIndicators = List(7) { false }
+        )
+        ensureFontsLoaded()
+        val canvas = createTestCanvas(100, 400)
+        view.draw(canvas)
+        val image = canvas.toImage()
+        val scale = image.width / canvas.getWidth()
+
+        // Squares are 50 wide; Sunday's square starts at (0, 50).
+        fun pixelAt(x: Double, y: Double) = image.getPixel((x * scale).toInt(), (y * scale).toInt())
+        assertEquals(Color(0xE53935), pixelAt(8.0, 58.0), "corner")
+        assertEquals(LightTheme().mediumContrastTextColor, pixelAt(40.0, 90.0), "rest of the square")
     }
 }

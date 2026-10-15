@@ -26,6 +26,7 @@ import org.isoron.uhabits.R
 import org.isoron.uhabits.core.models.Frequency
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.PaletteColor
+import org.isoron.uhabits.core.models.TargetPeriodMode
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -60,6 +61,15 @@ class TargetWidgetTest : BaseViewTest() {
     @Throws(Exception::class)
     fun testRender() {
         assertRenders(view, PATH + "render.png")
+    }
+
+    @Test
+    @Throws(Exception::class)
+    fun testRender_rollingWeek() {
+        habit.targetPeriodMode = TargetPeriodMode.ROLLING
+        habit.recompute()
+        val widget = TargetWidget(targetContext, 0, habit)
+        assertRenders(convertToView(widget, 400, 400), PATH + "renderRolling.png")
     }
 
     companion object {

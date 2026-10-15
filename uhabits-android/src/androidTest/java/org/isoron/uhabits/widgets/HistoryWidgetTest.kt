@@ -23,7 +23,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
 import org.isoron.uhabits.BaseViewTest
 import org.isoron.uhabits.R
+import org.isoron.uhabits.core.models.Frequency
 import org.isoron.uhabits.core.models.Habit
+import org.isoron.uhabits.core.models.NumericalHabitType
+import org.isoron.uhabits.core.models.PaletteColor
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -50,6 +53,20 @@ class HistoryWidgetTest : BaseViewTest() {
     @Throws(Exception::class)
     fun testRender() {
         assertRenders(view, PATH + "render.png")
+    }
+
+    @Test
+    @Throws(Exception::class)
+    fun testRender_weeklyAtMostHabit() {
+        val measurable = fixtures.createLongNumericalHabit().apply {
+            color = PaletteColor(11)
+            frequency = Frequency.WEEKLY
+            targetType = NumericalHabitType.AT_MOST
+            targetValue = 600.0
+            recompute()
+        }
+        val widget = HistoryWidget(targetContext, 0, measurable)
+        assertRenders(convertToView(widget, 400, 400), PATH + "renderWeeklyAtMost.png")
     }
 
     companion object {

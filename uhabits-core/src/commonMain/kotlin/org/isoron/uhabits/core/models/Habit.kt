@@ -81,6 +81,13 @@ data class Habit(
         return periodStatus(period)
     }
 
+    /**
+     * True for a weekly or monthly measurable habit, whose days are judged
+     * by their target period rather than one by one.
+     */
+    val isJudgedByPeriod: Boolean
+        get() = isNumerical && targetPeriod(getToday()) != null
+
     private fun yesOrNoStatus(date: LocalDate): DayStatus {
         return when (computedEntries.get(date).value) {
             Entry.UNKNOWN -> if (date < getToday()) DayStatus.MISSED else DayStatus.OPEN
@@ -154,7 +161,7 @@ data class Habit(
      * 30 days ending on it, or null for a daily habit. A rolling month is
      * 30 days however the frequency is stored.
      */
-    private fun targetPeriod(date: LocalDate): ClosedRange<LocalDate>? {
+    fun targetPeriod(date: LocalDate): ClosedRange<LocalDate>? {
         val isRolling = targetPeriodMode == TargetPeriodMode.ROLLING
         return when (periodUnit) {
             PeriodUnit.WEEK -> when {
@@ -184,25 +191,60 @@ data class Habit(
     }
 
     /**
-     * The verdict of a target period, or null when every day in it is
+     * The status of a target period, or null when every day in it is
      * skipped. A skipped day drops out, and the target scales to the days
      * that count; days still to come count. Totals are compared as ×1000
      * integers, `total × days` against `target × days that count`, so nothing
      * rounds.
      */
     private fun periodStatus(period: ClosedRange<LocalDate>): DayStatus? {
+        val tally = PeriodTally(period)
+        if (tally.daysThatCount == 0L) return null
+        val amounts = tally.entries.filter { it.state == Entry.AMOUNT }.map { it.amount!!.toLong() }
+        return judge(
+            total = amounts.sum() * tally.days,
+            target = targetX1000() * tally.daysThatCount,
+            isClosed = period.endInclusive < getToday(),
+            isEntered = amounts.isNotEmpty()
+        )
+    }
+
+    /**
+     * True on the day an "at most" calendar period's total first went over
+     * its cap, scaled for skips as the period's status scales it. Rolling
+     * windows have no such day: each day is judged by a window of its own.
+     */
+    fun wentOverCapOn(date: LocalDate): Boolean {
+        if (!isNumerical || targetType != NumericalHabitType.AT_MOST) return false
+        if (targetPeriodMode == TargetPeriodMode.ROLLING) return false
+        val period = targetPeriod(date) ?: return false
+        val tally = PeriodTally(period)
+        var total = 0L
+        for (entry in tally.entries.reversed()) {
+            if (entry.state == Entry.AMOUNT) total += entry.amount!!
+            if (total * tally.days > targetX1000() * tally.daysThatCount) return entry.date == date
+        }
+        return false
+    }
+
+    /**
+     * A target period's total so far and its target scaled to the days that
+     * count, both in the habit's unit.
+     */
+    fun progressIn(period: ClosedRange<LocalDate>): PeriodProgress {
+        val tally = PeriodTally(period)
+        return PeriodProgress(
+            total = tally.entries.sumOf { it.amount ?: 0 } / 1000.0,
+            target = targetValue * tally.daysThatCount / tally.days
+        )
+    }
+
+    /** A target period's entries in state form, newest first, and its days. */
+    private inner class PeriodTally(period: ClosedRange<LocalDate>) {
         val entries = computedEntries.getByInterval(period.start, period.endInclusive)
             .map { it.toStateForm(isNumerical = true) }
         val days = period.start.daysUntil(period.endInclusive) + 1L
         val daysThatCount = days - entries.count { it.state == Entry.SKIP }
-        if (daysThatCount == 0L) return null
-        val amounts = entries.filter { it.state == Entry.AMOUNT }.map { it.amount!!.toLong() }
-        return judge(
-            total = amounts.sum() * days,
-            target = targetX1000() * daysThatCount,
-            isClosed = period.endInclusive < getToday(),
-            isEntered = amounts.isNotEmpty()
-        )
     }
 
     fun isEnteredToday(): Boolean {
@@ -305,3 +347,6 @@ data class Habit(
         return result
     }
 }
+
+/** A target period's total so far against its target, scaled for skips. */
+data class PeriodProgress(val total: Double, val target: Double)

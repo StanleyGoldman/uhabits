@@ -55,13 +55,13 @@ open class CheckmarkWidget(
             activeColor = WidgetTheme().color(habit.color).toInt()
             name = habit.name
             if (habit.isNumerical) {
-                val entry = habit.computedEntries.get(today).toStateForm(isNumerical = true)
+                val entry = habit.computedEntries.get(today)
                 isNumerical = true
                 amountState = entry.state
                 amount = entry.amount ?: 0
                 entryState = getNumericalEntryState()
             } else {
-                entryState = habit.computedEntries.get(today).value
+                entryState = habit.computedEntries.get(today).state
             }
             percentage = habit.scores[today].value.toFloat()
             refresh()

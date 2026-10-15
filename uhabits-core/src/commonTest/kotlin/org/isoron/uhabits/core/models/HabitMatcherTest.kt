@@ -106,7 +106,7 @@ class HabitMatcherTest : BaseUnitTest() {
             for (daysAgo in 1..3) originalEntries.add(Entry(getToday().minus(daysAgo), Entry.YES_MANUAL))
             recompute()
         }
-        assertEquals(Entry.YES_AUTO, autoOnly.computedEntries.get(getToday()).value)
+        assertEquals(Entry.YES_AUTO, autoOnly.computedEntries.get(getToday()).state)
         val measurableUntouched = buildMeasurableHabit("Measurable untouched")
         val measurableUnknown = buildMeasurableHabit("Measurable unknown").withEntryToday(Entry.UNKNOWN)
 
@@ -119,9 +119,9 @@ class HabitMatcherTest : BaseUnitTest() {
         val yes = buildHabit("Yes").withEntryToday(Entry.YES_MANUAL)
         val no = buildHabit("No").withEntryToday(Entry.NO)
         val skip = buildHabit("Skip").withEntryToday(Entry.SKIP)
-        val amount = buildMeasurableHabit("Amount").withEntryToday(5000)
-        val zero = buildMeasurableHabit("Zero").withEntryToday(0)
-        val tinyAmount = buildMeasurableHabit("0.001").withEntryToday(1)
+        val amount = buildMeasurableHabit("Amount").withAmountToday(5000)
+        val zero = buildMeasurableHabit("Zero").withAmountToday(0)
+        val tinyAmount = buildMeasurableHabit("0.001").withAmountToday(1)
         val measurableSkip = buildMeasurableHabit("Measurable skip").withEntryToday(Entry.SKIP)
 
         val habits = listOf(yes, no, skip, amount, zero, tinyAmount, measurableSkip)
@@ -132,7 +132,7 @@ class HabitMatcherTest : BaseUnitTest() {
     fun testHideCompleted_hidesHabitsMetToday() {
         val yes = buildHabit("Yes").withEntryToday(Entry.YES_MANUAL)
         val skip = buildHabit("Skip").withEntryToday(Entry.SKIP)
-        val atTarget = buildMeasurableHabit("At target").withEntryToday(10000)
+        val atTarget = buildMeasurableHabit("At target").withAmountToday(10000)
         val measurableSkip = buildMeasurableHabit("Measurable skip").withEntryToday(Entry.SKIP)
 
         val habits = listOf(yes, skip, atTarget, measurableSkip)
@@ -143,11 +143,11 @@ class HabitMatcherTest : BaseUnitTest() {
     fun testHideCompleted_keepsHabitsOpenOrMissedToday() {
         val untouched = buildHabit("Untouched")
         val no = buildHabit("No").withEntryToday(Entry.NO)
-        val belowTarget = buildMeasurableHabit("Below target").withEntryToday(4000)
+        val belowTarget = buildMeasurableHabit("Below target").withAmountToday(4000)
         val underCap = buildMeasurableHabit("Under cap", NumericalHabitType.AT_MOST, 5.0)
-            .withEntryToday(1000)
+            .withAmountToday(1000)
         val overCap = buildMeasurableHabit("Over cap", NumericalHabitType.AT_MOST, 5.0)
-            .withEntryToday(6000)
+            .withAmountToday(6000)
 
         val habits = listOf(untouched, no, belowTarget, underCap, overCap)
         assertEquals(habits, habits.filter(HabitMatcher(isCompletedAllowed = false)::matches))
@@ -194,8 +194,14 @@ class HabitMatcherTest : BaseUnitTest() {
         }
     }
 
-    private fun Habit.withEntryToday(value: Int): Habit {
-        originalEntries.add(Entry(getToday(), value))
+    private fun Habit.withEntryToday(state: Int): Habit {
+        originalEntries.add(Entry(getToday(), state))
+        recompute()
+        return this
+    }
+
+    private fun Habit.withAmountToday(amount: Int): Habit {
+        originalEntries.add(Entry(getToday(), Entry.AMOUNT, amount))
         recompute()
         return this
     }

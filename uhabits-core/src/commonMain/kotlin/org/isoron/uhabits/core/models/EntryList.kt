@@ -100,7 +100,7 @@ open class EntryList {
             val intervals = buildIntervals(frequency, original)
             snapIntervalsTogether(intervals)
             val computed = buildEntriesFromInterval(original, intervals)
-            computed.filter { it.value != UNKNOWN || it.notes.isNotEmpty() }.forEach { add(it) }
+            computed.filter { it.state != UNKNOWN || it.notes.isNotEmpty() }.forEach { add(it) }
         }
     }
 
@@ -130,8 +130,7 @@ open class EntryList {
     fun computeWeekdayFrequency(isNumerical: Boolean): HashMap<LocalDate, Array<Int>> {
         val entries = getKnown()
         val map = hashMapOf<LocalDate, Array<Int>>()
-        for (original in entries) {
-            val entry = original.toStateForm(isNumerical)
+        for (entry in entries) {
             val weekday = (entry.date.dayOfWeek.daysSinceSunday + 1) % 7
             val monthStart = entry.date.startOfMonth()
 
@@ -203,16 +202,16 @@ open class EntryList {
             // Copy original entries
             original.forEach { entry ->
                 val offset = entry.date.daysUntil(to)
-                val value = if (
-                    result[offset].value == UNKNOWN ||
-                    entry.value == SKIP ||
-                    entry.value == YES_MANUAL
+                val state = if (
+                    result[offset].state == UNKNOWN ||
+                    entry.state == SKIP ||
+                    entry.state == YES_MANUAL
                 ) {
-                    entry.value
+                    entry.state
                 } else {
                     YES_AUTO
                 }
-                result[offset] = Entry(entry.date, value, entry.notes)
+                result[offset] = Entry(entry.date, state, notes = entry.notes)
             }
 
             return result
@@ -247,7 +246,7 @@ open class EntryList {
             freq: Frequency,
             entries: List<Entry>
         ): ArrayList<Interval> {
-            val filtered = entries.filter { it.value == YES_MANUAL }
+            val filtered = entries.filter { it.state == YES_MANUAL }
             val num = freq.numerator
             val den = freq.denominator
             val intervals = arrayListOf<Interval>()
@@ -287,17 +286,19 @@ private fun truncateDate(
 }
 
 /**
+ * The total of a group of days: [date] is the first day of the group (as
+ * truncated by [groupedSum] or [countSkippedDays]), and [total] what they add up to.
+ */
+data class GroupedTotal(val date: LocalDate, val total: Int)
+
+/**
  * Given a list of entries, truncates the date of each entry (according to the field given),
- * groups the entries according to this truncated date, then creates a new entry (d,v) for
- * each group, where d is the truncated date and v is the sum of the values of all entries in
- * the group.
+ * groups the entries according to this truncated date, and sums each group.
  *
- * For numerical habits, non-positive entry values are converted to zero. For boolean habits, each
- * YES_MANUAL value is converted to 1000 and all other values are converted to zero.
+ * For a measurable habit, each amount adds itself ×1000, with a negative amount counting as zero.
+ * For a yes-or-no habit, each YES_MANUAL adds 1000. Skipped and unknown days add nothing.
  *
- * SKIP values are converted to zero (if they weren't, each SKIP day would count as 0.003).
- *
- * The returned list is sorted by date, with the newest entry coming first and the oldest entry
+ * The returned list is sorted by date, with the newest group coming first and the oldest group
  * coming last. If the original list has gaps in it (for example, weeks or months without any
  * entries), then the list produced by this method will also have gaps.
  *
@@ -307,49 +308,35 @@ fun List<Entry>.groupedSum(
     truncateField: TruncateField,
     firstWeekday: Int = 7,
     isNumerical: Boolean
-): List<Entry> {
-    val firstWeekdayEnum = DayOfWeek.values()[firstWeekday - 1]
-    return this.map { entry ->
-        val date = entry.date
-        val value = entry.value
-        if (isNumerical) {
-            if (value == SKIP) {
-                Entry(date, 0)
-            } else {
-                Entry(date, max(0, value))
-            }
-        } else {
-            Entry(date, if (value == YES_MANUAL) 1000 else 0)
+): List<GroupedTotal> {
+    return groupedTotals(truncateField, firstWeekday) { entry ->
+        when {
+            isNumerical && entry.state == AMOUNT -> max(0, entry.amount!!)
+            !isNumerical && entry.state == YES_MANUAL -> 1000
+            else -> 0
         }
-    }.groupBy { entry ->
-        truncateDate(entry.date, truncateField, firstWeekdayEnum)
-    }.entries.map { (date, entries) ->
-        Entry(date, entries.sumOf { it.value })
-    }.sortedBy { (date, _) ->
-        -date.daysSince2000
     }
 }
 
 /**
- * Counts the number of days with value SKIP in the given period.
+ * Counts the number of skipped days in each group, as [groupedSum] groups them.
  */
 fun List<Entry>.countSkippedDays(
     truncateField: TruncateField,
     firstWeekday: Int = 7
-): List<Entry> {
+): List<GroupedTotal> {
+    return groupedTotals(truncateField, firstWeekday) { if (it.state == SKIP) 1 else 0 }
+}
+
+private fun List<Entry>.groupedTotals(
+    truncateField: TruncateField,
+    firstWeekday: Int,
+    valueOf: (Entry) -> Int
+): List<GroupedTotal> {
     val firstWeekdayEnum = DayOfWeek.values()[firstWeekday - 1]
-    return this.map { entry ->
-        val date = entry.date
-        if (entry.value == SKIP) {
-            Entry(date, 1)
-        } else {
-            Entry(date, 0)
-        }
-    }.groupBy { entry ->
+    return this.groupBy { entry ->
         truncateDate(entry.date, truncateField, firstWeekdayEnum)
     }.entries.map { (date, entries) ->
-        Entry(date, entries.sumOf { it.value })
-    }.sortedBy { (date, _) ->
-        -date.daysSince2000
-    }
+        GroupedTotal(date, entries.sumOf(valueOf))
+    }.sortedBy { -it.date.daysSince2000 }
 }

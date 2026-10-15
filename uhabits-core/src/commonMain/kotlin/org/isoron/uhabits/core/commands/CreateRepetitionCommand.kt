@@ -32,10 +32,6 @@ data class CreateRepetitionCommand(
     val amount: Int?,
     val notes: String
 ) : Command {
-    /** The old form: [value] is an old-form entry value, as [Entry]'s secondary constructor takes it. */
-    constructor(habitList: HabitList, habit: Habit, date: LocalDate, value: Int, notes: String) :
-        this(habitList, habit, date, value, null, notes)
-
     /** Records [entry], in state and amount form, on its date. */
     constructor(habitList: HabitList, habit: Habit, entry: Entry) :
         this(habitList, habit, entry.date, entry.state, entry.amount, entry.notes)

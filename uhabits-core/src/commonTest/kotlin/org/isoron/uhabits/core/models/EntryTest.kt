@@ -19,6 +19,8 @@
 
 package org.isoron.uhabits.core.models
 
+import org.isoron.platform.time.LocalDate
+import org.isoron.uhabits.core.models.Entry.Companion.AMOUNT
 import org.isoron.uhabits.core.models.Entry.Companion.NO
 import org.isoron.uhabits.core.models.Entry.Companion.SKIP
 import org.isoron.uhabits.core.models.Entry.Companion.UNKNOWN
@@ -27,8 +29,24 @@ import org.isoron.uhabits.core.models.Entry.Companion.YES_MANUAL
 import org.isoron.uhabits.core.models.Entry.Companion.nextToggleValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class EntryTest {
+    private val date = LocalDate(2015, 1, 25)
+
+    @Test
+    fun testOnlyAnAmountEntryCarriesAnAmount() {
+        assertEquals(2500, Entry(date, AMOUNT, 2500).amount)
+        assertFailsWith<IllegalArgumentException> { Entry(date, AMOUNT) }
+        assertFailsWith<IllegalArgumentException> { Entry(date, SKIP, 3) }
+    }
+
+    @Test
+    fun testAnAmountIsNotAState() {
+        assertFailsWith<IllegalArgumentException> { Entry(date, 2500) }
+        assertFailsWith<IllegalArgumentException> { Entry(date, -2) }
+    }
+
     @Test
     fun testNextValue() {
         check(
@@ -85,7 +103,7 @@ class EntryTest {
         for ((value, expected) in map) {
             assertEquals(
                 nextToggleValue(
-                    value = value,
+                    state = value,
                     isSkipEnabled = isSkipEnabled,
                     areQuestionMarksEnabled = areQuestionMarksEnabled
                 ),

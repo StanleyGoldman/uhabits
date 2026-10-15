@@ -109,8 +109,8 @@ class HabitFixtures(private val modelFactory: ModelFactory, private val habitLis
         }
         habitList.add(habit)
         var date: LocalDate = getToday()
-        for (value in LONG_NUMERICAL_HABIT_ENTRIES) {
-            habit.originalEntries.add(Entry(date, value))
+        for (amount in LONG_NUMERICAL_HABIT_ENTRIES) {
+            habit.originalEntries.add(Entry(date, Entry.AMOUNT, amount))
             date = date.minus(1)
         }
         habit.recompute()

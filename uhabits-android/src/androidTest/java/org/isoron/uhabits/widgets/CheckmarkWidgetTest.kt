@@ -55,7 +55,7 @@ class CheckmarkWidgetTest : BaseViewTest() {
         entries = habit.computedEntries
         val widget = CheckmarkWidget(targetContext, 0, habit)
         view = convertToView(widget, 150, 200)
-        assertThat(entries.get(today).value, equalTo(Entry.YES_MANUAL))
+        assertThat(entries.get(today).state, equalTo(Entry.YES_MANUAL))
     }
 
     @Test
@@ -71,10 +71,10 @@ class CheckmarkWidgetTest : BaseViewTest() {
         // possible to capture intents sent to BroadcastReceivers.
         button.performClick()
         sleep(1000)
-        assertThat(entries.get(today).value, equalTo(Entry.SKIP))
+        assertThat(entries.get(today).state, equalTo(Entry.SKIP))
         button.performClick()
         sleep(1000)
-        assertThat(entries.get(today).value, equalTo(Entry.NO))
+        assertThat(entries.get(today).state, equalTo(Entry.NO))
     }
 
     @Test

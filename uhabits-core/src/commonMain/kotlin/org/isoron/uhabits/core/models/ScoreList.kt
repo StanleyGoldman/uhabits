@@ -82,7 +82,6 @@ class ScoreList {
         val freq = frequency.toDouble()
         val isAtMost = isNumerical && numericalHabitType == NumericalHabitType.AT_MOST
         val entries = computedEntries.getByInterval(from, to)
-            .map { it.toStateForm(isNumerical) }
             .reversed()
 
         // What each day adds to the window: the amount ×1000 for numerical habits, one per

@@ -38,16 +38,16 @@ class CreateRepetitionCommandTest : BaseUnitTest() {
         habit = fixtures.createShortHabit()
         habitList.add(habit)
         today = getToday()
-        command = CreateRepetitionCommand(habitList, habit, today, 100, "")
+        command = CreateRepetitionCommand(habitList, habit, today, Entry.NO, amount = null, notes = "")
     }
 
     @Test
     fun testExecute() {
         val entries = habit.originalEntries
         var entry = entries.get(today)
-        assertEquals(Entry.YES_MANUAL, entry.value)
+        assertEquals(Entry.YES_MANUAL, entry.state)
         command.run()
         entry = entries.get(today)
-        assertEquals(100, entry.value.toLong())
+        assertEquals(Entry.NO, entry.state)
     }
 }

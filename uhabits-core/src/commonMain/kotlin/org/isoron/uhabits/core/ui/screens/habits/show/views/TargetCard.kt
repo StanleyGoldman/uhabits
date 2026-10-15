@@ -66,49 +66,49 @@ class TargetCardPresenter {
             val valueToday = entries.groupedSum(
                 truncateField = TruncateField.DAY,
                 isNumerical = habit.isNumerical
-            ).firstOrNull()?.value ?: 0
+            ).firstOrNull()?.total ?: 0
 
             val skippedDayToday = entries.countSkippedDays(
                 truncateField = TruncateField.DAY
-            ).firstOrNull()?.value ?: 0
+            ).firstOrNull()?.total ?: 0
 
             val valueThisWeek = entries.groupedSum(
                 truncateField = TruncateField.WEEK_NUMBER,
                 firstWeekday = firstWeekday,
                 isNumerical = habit.isNumerical
-            ).firstOrNull()?.value ?: 0
+            ).firstOrNull()?.total ?: 0
 
             val skippedDaysThisWeek = entries.countSkippedDays(
                 truncateField = TruncateField.WEEK_NUMBER,
                 firstWeekday = firstWeekday
-            ).firstOrNull()?.value ?: 0
+            ).firstOrNull()?.total ?: 0
 
             val valueThisMonth = entries.groupedSum(
                 truncateField = TruncateField.MONTH,
                 isNumerical = habit.isNumerical
-            ).firstOrNull()?.value ?: 0
+            ).firstOrNull()?.total ?: 0
 
             val skippedDaysThisMonth = entries.countSkippedDays(
                 truncateField = TruncateField.MONTH
-            ).firstOrNull()?.value ?: 0
+            ).firstOrNull()?.total ?: 0
 
             val valueThisQuarter = entries.groupedSum(
                 truncateField = TruncateField.QUARTER,
                 isNumerical = habit.isNumerical
-            ).firstOrNull()?.value ?: 0
+            ).firstOrNull()?.total ?: 0
 
             val skippedDaysThisQuarter = entries.countSkippedDays(
                 truncateField = TruncateField.QUARTER
-            ).firstOrNull()?.value ?: 0
+            ).firstOrNull()?.total ?: 0
 
             val valueThisYear = entries.groupedSum(
                 truncateField = TruncateField.YEAR,
                 isNumerical = habit.isNumerical
-            ).firstOrNull()?.value ?: 0
+            ).firstOrNull()?.total ?: 0
 
             val skippedDaysThisYear = entries.countSkippedDays(
                 truncateField = TruncateField.YEAR
-            ).firstOrNull()?.value ?: 0
+            ).firstOrNull()?.total ?: 0
 
             val daysInMonth = today.monthLength
             val daysInWeek = 7

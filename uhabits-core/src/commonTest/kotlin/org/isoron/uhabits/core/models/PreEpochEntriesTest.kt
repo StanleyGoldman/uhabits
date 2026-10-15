@@ -71,7 +71,7 @@ class PreEpochEntriesTest : BaseUnitTest() {
             targetValue = 2.0
             frequency = Frequency.WEEKLY
         }
-        addEntriesAroundEpochAndToday(habit, THREE_UNITS)
+        addEntriesAroundEpochAndToday(habit, Entry.AMOUNT, THREE_UNITS)
         assertStreakSpansBothPreEpochDays(habit)
         assertWeekdayCountsAroundEpoch(habit, expected = THREE_UNITS)
         assertEquals(DayStatus.MET, habit.todayStatus())
@@ -84,9 +84,9 @@ class PreEpochEntriesTest : BaseUnitTest() {
         return habit
     }
 
-    private fun addEntriesAroundEpochAndToday(habit: Habit, value: Int) {
+    private fun addEntriesAroundEpochAndToday(habit: Habit, state: Int, amount: Int? = null) {
         for (date in listOf(newYearsEve1969, epochDay, getToday())) {
-            habit.originalEntries.add(Entry(date, value))
+            habit.originalEntries.add(Entry(date, state, amount))
         }
         habit.recompute()
     }

@@ -63,7 +63,7 @@ open class ListHabitsBehavior(
             screen.showNumberPopup(NumberField.of(entry), entry.notes, onDismiss) { input, newNotes ->
                 val newEntry = input.toEntry(entry, newNotes)
                 val newAmount = newEntry.amount
-                if (newAmount != null && newAmount != entry.toStateForm(isNumerical = true).amount) {
+                if (newAmount != null && newAmount != entry.amount) {
                     val newValue = newAmount / 1000.0
                     if (
                         (habit.targetType == AT_LEAST && newValue >= habit.targetValue) ||
@@ -76,13 +76,13 @@ open class ListHabitsBehavior(
             }
         } else {
             screen.showCheckmarkPopup(
-                entry.value,
+                entry.state,
                 entry.notes,
                 habit.color,
                 onDismiss
-            ) { newValue: Int, newNotes: String ->
-                if (newValue != entry.value && newValue == YES_MANUAL) screen.showConfetti(habit.color, x, y)
-                commandRunner.run(CreateRepetitionCommand(habitList, habit, date, newValue, newNotes))
+            ) { newState: Int, newNotes: String ->
+                if (newState != entry.state && newState == YES_MANUAL) screen.showConfetti(habit.color, x, y)
+                commandRunner.run(CreateRepetitionCommand(habitList, habit, date, newState, amount = null, notes = newNotes))
             }
         }
     }
@@ -138,12 +138,12 @@ open class ListHabitsBehavior(
         if (prefs.isFirstRun) onFirstRun()
     }
 
-    open fun onToggle(habit: Habit, date: LocalDate, value: Int, notes: String, x: Float, y: Float) {
+    open fun onToggle(habit: Habit, date: LocalDate, state: Int, notes: String, x: Float, y: Float) {
         habit.id?.let { cache.startGracePeriod(it) }
         commandRunner.run(
-            CreateRepetitionCommand(habitList, habit, date, value, notes)
+            CreateRepetitionCommand(habitList, habit, date, state, amount = null, notes = notes)
         )
-        if (value == YES_MANUAL) screen.showConfetti(habit.color, x, y)
+        if (state == YES_MANUAL) screen.showConfetti(habit.color, x, y)
     }
 
     enum class Message {

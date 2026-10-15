@@ -42,28 +42,28 @@ class EntryListTest {
         assertEquals(Entry(today.minus(2), UNKNOWN), entries.get(today.minus(2)))
         assertEquals(Entry(today.minus(5), UNKNOWN), entries.get(today.minus(5)))
 
-        entries.add(Entry(today.minus(0), 10))
-        entries.add(Entry(today.minus(0), 15)) // replace previous one
-        entries.add(Entry(today.minus(5), 20))
-        entries.add(Entry(today.minus(8), 30))
-        assertEquals(Entry(today.minus(0), 15), entries.get(today.minus(0)))
-        assertEquals(Entry(today.minus(5), 20), entries.get(today.minus(5)))
-        assertEquals(Entry(today.minus(8), 30), entries.get(today.minus(8)))
+        entries.add(Entry(today.minus(0), AMOUNT, 10))
+        entries.add(Entry(today.minus(0), AMOUNT, 15)) // replace previous one
+        entries.add(Entry(today.minus(5), AMOUNT, 20))
+        entries.add(Entry(today.minus(8), AMOUNT, 30))
+        assertEquals(Entry(today.minus(0), AMOUNT, 15), entries.get(today.minus(0)))
+        assertEquals(Entry(today.minus(5), AMOUNT, 20), entries.get(today.minus(5)))
+        assertEquals(Entry(today.minus(8), AMOUNT, 30), entries.get(today.minus(8)))
 
         val known = entries.getKnown()
         assertEquals(3, known.size)
-        assertEquals(Entry(today.minus(0), 15), known[0])
-        assertEquals(Entry(today.minus(5), 20), known[1])
-        assertEquals(Entry(today.minus(8), 30), known[2])
+        assertEquals(Entry(today.minus(0), AMOUNT, 15), known[0])
+        assertEquals(Entry(today.minus(5), AMOUNT, 20), known[1])
+        assertEquals(Entry(today.minus(8), AMOUNT, 30), known[2])
 
         val actual = entries.getByInterval(today.minus(5), today)
         assertEquals(6, actual.size)
-        assertEquals(Entry(today.minus(0), 15), actual[0])
+        assertEquals(Entry(today.minus(0), AMOUNT, 15), actual[0])
         assertEquals(Entry(today.minus(1), UNKNOWN), actual[1])
         assertEquals(Entry(today.minus(2), UNKNOWN), actual[2])
         assertEquals(Entry(today.minus(3), UNKNOWN), actual[3])
         assertEquals(Entry(today.minus(4), UNKNOWN), actual[4])
-        assertEquals(Entry(today.minus(5), 20), actual[5])
+        assertEquals(Entry(today.minus(5), AMOUNT, 20), actual[5])
     }
 
     @Test
@@ -101,17 +101,17 @@ class EntryListTest {
         val today = LocalDate(2015, 1, 25)
 
         val original = EntryList()
-        original.add(Entry(today.minus(4), 100))
-        original.add(Entry(today.minus(9), 200))
-        original.add(Entry(today.minus(10), 300))
+        original.add(Entry(today.minus(4), AMOUNT, 100))
+        original.add(Entry(today.minus(9), AMOUNT, 200))
+        original.add(Entry(today.minus(10), AMOUNT, 300))
 
         val computed = EntryList()
         computed.recomputeFrom(original, Frequency.DAILY, isNumerical = true)
 
         val expected = listOf(
-            Entry(today.minus(4), 100),
-            Entry(today.minus(9), 200),
-            Entry(today.minus(10), 300)
+            Entry(today.minus(4), AMOUNT, 100),
+            Entry(today.minus(9), AMOUNT, 200),
+            Entry(today.minus(10), AMOUNT, 300)
         )
         assertEquals(expected, computed.getKnown())
     }
@@ -140,7 +140,7 @@ class EntryListTest {
         val reference = LocalDate(2014, 6, 1)
         val entries = EntryList()
         offsets.indices.forEach {
-            entries.add(Entry(reference.minus(offsets[it]), values[it]))
+            entries.add(Entry(reference.minus(offsets[it]), AMOUNT, values[it]))
         }
 
         val byMonth = entries.getKnown().groupedSum(
@@ -148,26 +148,26 @@ class EntryListTest {
             isNumerical = true
         )
         assertEquals(17, byMonth.size)
-        assertEquals(Entry(LocalDate(2014, 6, 1), 230), byMonth[0])
-        assertEquals(Entry(LocalDate(2013, 12, 1), 1988), byMonth[6])
-        assertEquals(Entry(LocalDate(2013, 5, 1), 1271), byMonth[12])
+        assertEquals(GroupedTotal(LocalDate(2014, 6, 1), 230), byMonth[0])
+        assertEquals(GroupedTotal(LocalDate(2013, 12, 1), 1988), byMonth[6])
+        assertEquals(GroupedTotal(LocalDate(2013, 5, 1), 1271), byMonth[12])
 
         val byQuarter = entries.getKnown().groupedSum(
             truncateField = TruncateField.QUARTER,
             isNumerical = true
         )
         assertEquals(6, byQuarter.size)
-        assertEquals(Entry(LocalDate(2014, 4, 1), 3263), byQuarter[0])
-        assertEquals(Entry(LocalDate(2013, 7, 1), 3838), byQuarter[3])
-        assertEquals(Entry(LocalDate(2013, 1, 1), 4975), byQuarter[5])
+        assertEquals(GroupedTotal(LocalDate(2014, 4, 1), 3263), byQuarter[0])
+        assertEquals(GroupedTotal(LocalDate(2013, 7, 1), 3838), byQuarter[3])
+        assertEquals(GroupedTotal(LocalDate(2013, 1, 1), 4975), byQuarter[5])
 
         val byYear = entries.getKnown().groupedSum(
             truncateField = TruncateField.YEAR,
             isNumerical = true
         )
         assertEquals(2, byYear.size)
-        assertEquals(Entry(LocalDate(2014, 1, 1), 8227), byYear[0])
-        assertEquals(Entry(LocalDate(2013, 1, 1), 16172), byYear[1])
+        assertEquals(GroupedTotal(LocalDate(2014, 1, 1), 8227), byYear[0])
+        assertEquals(GroupedTotal(LocalDate(2013, 1, 1), 16172), byYear[1])
     }
 
     @Test
@@ -192,33 +192,33 @@ class EntryListTest {
             isNumerical = false
         )
         assertEquals(17, byMonth.size)
-        assertEquals(Entry(LocalDate(2014, 6, 1), 1_000), byMonth[0])
-        assertEquals(Entry(LocalDate(2013, 12, 1), 7_000), byMonth[6])
-        assertEquals(Entry(LocalDate(2013, 5, 1), 6_000), byMonth[12])
+        assertEquals(GroupedTotal(LocalDate(2014, 6, 1), 1_000), byMonth[0])
+        assertEquals(GroupedTotal(LocalDate(2013, 12, 1), 7_000), byMonth[6])
+        assertEquals(GroupedTotal(LocalDate(2013, 5, 1), 6_000), byMonth[12])
 
         val byQuarter = entries.getKnown().groupedSum(
             truncateField = TruncateField.QUARTER,
             isNumerical = false
         )
         assertEquals(6, byQuarter.size)
-        assertEquals(Entry(LocalDate(2014, 4, 1), 15_000), byQuarter[0])
-        assertEquals(Entry(LocalDate(2013, 7, 1), 17_000), byQuarter[3])
-        assertEquals(Entry(LocalDate(2013, 1, 1), 20_000), byQuarter[5])
+        assertEquals(GroupedTotal(LocalDate(2014, 4, 1), 15_000), byQuarter[0])
+        assertEquals(GroupedTotal(LocalDate(2013, 7, 1), 17_000), byQuarter[3])
+        assertEquals(GroupedTotal(LocalDate(2013, 1, 1), 20_000), byQuarter[5])
 
         val byYear = entries.getKnown().groupedSum(
             truncateField = TruncateField.YEAR,
             isNumerical = false
         )
         assertEquals(2, byYear.size)
-        assertEquals(Entry(LocalDate(2014, 1, 1), 34_000), byYear[0])
-        assertEquals(Entry(LocalDate(2013, 1, 1), 66_000), byYear[1])
+        assertEquals(GroupedTotal(LocalDate(2014, 1, 1), 34_000), byYear[0])
+        assertEquals(GroupedTotal(LocalDate(2013, 1, 1), 66_000), byYear[1])
     }
 
     @Test
     fun testAddFromInterval() {
         val entries = listOf(
             Entry(day(1), YES_MANUAL),
-            Entry(day(2), NO, "Test"),
+            Entry(day(2), NO, notes = "Test"),
             Entry(day(4), NO),
             Entry(day(5), YES_MANUAL),
             Entry(day(10), YES_MANUAL),
@@ -231,7 +231,7 @@ class EntryListTest {
         )
         val expected = listOf(
             Entry(day(1), YES_MANUAL),
-            Entry(day(2), YES_AUTO, "Test"),
+            Entry(day(2), YES_AUTO, notes = "Test"),
             Entry(day(3), UNKNOWN),
             Entry(day(4), YES_AUTO),
             Entry(day(5), YES_MANUAL),

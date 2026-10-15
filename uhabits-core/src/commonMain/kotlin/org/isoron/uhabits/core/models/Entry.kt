@@ -31,33 +31,13 @@ data class Entry(
     val date: LocalDate,
     val state: Int,
     /** The amount ×1000, non-null only when [state] is [AMOUNT]. */
-    val amount: Int?,
+    val amount: Int? = null,
     val notes: String = ""
 ) {
-    /**
-     * Builds an entry in the old single-value form, where a measurable habit's
-     * amount sits in [value]. Storage converts it with [toStateForm].
-     */
-    constructor(date: LocalDate, value: Int, notes: String = "") :
-        this(date, value, null, notes)
-
-    /**
-     * Compatibility view of the old single-value form: the amount when there
-     * is one, otherwise the state. Readers move to [state] and [amount].
-     */
-    val value: Int
-        get() = amount ?: state
-
-    /**
-     * Converts an entry that may be in the old single-value form into state
-     * and amount, using the same rules as migration 26.
-     */
-    fun toStateForm(isNumerical: Boolean): Entry {
-        if (!isNumerical || amount != null) return this
-        return when (state) {
-            SKIP, UNKNOWN -> this
-            YES_MANUAL -> copy(state = AMOUNT, amount = 1000)
-            else -> copy(state = AMOUNT, amount = state)
+    init {
+        require(state in UNKNOWN..AMOUNT) { "Unknown entry state: $state" }
+        require((state == AMOUNT) == (amount != null)) {
+            "An entry has an amount exactly when its state is AMOUNT: state=$state, amount=$amount"
         }
     }
 
@@ -95,11 +75,11 @@ data class Entry(
         const val UNKNOWN = -1
 
         fun nextToggleValue(
-            value: Int,
+            state: Int,
             isSkipEnabled: Boolean,
             areQuestionMarksEnabled: Boolean
         ): Int {
-            return when (value) {
+            return when (state) {
                 YES_AUTO -> YES_MANUAL
                 YES_MANUAL -> if (isSkipEnabled) SKIP else NO
                 SKIP -> NO

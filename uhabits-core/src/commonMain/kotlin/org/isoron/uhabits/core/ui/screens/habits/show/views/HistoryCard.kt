@@ -99,17 +99,18 @@ class HistoryCardPresenter(
     private fun showCheckmarkPopup(date: LocalDate) {
         val entry = habit.computedEntries.get(date)
         screen.showCheckmarkPopup(
-            entry.value,
+            entry.state,
             entry.notes,
             habit.color
-        ) { newValue, newNotes ->
+        ) { newState, newNotes ->
             commandRunner.run(
                 CreateRepetitionCommand(
                     habitList,
                     habit,
                     date,
-                    newValue,
-                    newNotes
+                    newState,
+                    amount = null,
+                    notes = newNotes
                 )
             )
         }
@@ -117,8 +118,8 @@ class HistoryCardPresenter(
 
     private fun toggle(date: LocalDate) {
         val entry = habit.computedEntries.get(date)
-        val nextValue = Entry.nextToggleValue(
-            value = entry.value,
+        val nextState = Entry.nextToggleValue(
+            state = entry.state,
             isSkipEnabled = preferences.isSkipEnabled,
             areQuestionMarksEnabled = preferences.areQuestionMarksEnabled
         )
@@ -127,8 +128,9 @@ class HistoryCardPresenter(
                 habitList,
                 habit,
                 date,
-                nextValue,
-                entry.notes
+                nextState,
+                amount = null,
+                notes = entry.notes
             )
         )
     }
@@ -166,16 +168,16 @@ class HistoryCardPresenter(
             } else if (habit.isNumerical) {
                 entries.map {
                     when {
-                        it.value == Entry.UNKNOWN -> OFF
-                        it.value == SKIP -> HATCHED
-                        (habit.targetType == AT_MOST) && (it.value / 1000.0 <= habit.targetValue) -> ON
-                        (habit.targetType == AT_LEAST) && (it.value / 1000.0 >= habit.targetValue) -> ON
+                        it.state == Entry.UNKNOWN -> OFF
+                        it.state == SKIP -> HATCHED
+                        (habit.targetType == AT_MOST) && (it.amount!! / 1000.0 <= habit.targetValue) -> ON
+                        (habit.targetType == AT_LEAST) && (it.amount!! / 1000.0 >= habit.targetValue) -> ON
                         else -> GREY
                     }
                 }
             } else {
                 entries.map {
-                    when (it.value) {
+                    when (it.state) {
                         YES_MANUAL -> ON
                         YES_AUTO -> DIMMED
                         SKIP -> HATCHED
@@ -206,7 +208,7 @@ class HistoryCardPresenter(
          * from its period's status and what was entered on the day.
          */
         private fun periodSquare(habit: Habit, entry: Entry): HistoryChart.Square {
-            val state = entry.toStateForm(isNumerical = true).state
+            val state = entry.state
             val status = habit.statusOn(entry.date)
             if (state == Entry.SKIP) return if (status == DayStatus.MISSED) GREY_HATCHED else HATCHED
             return when (status) {

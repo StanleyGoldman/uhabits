@@ -89,7 +89,7 @@ class HabitTest : BaseUnitTest() {
         h.frequency = Frequency.WEEKLY
         h.originalEntries.add(Entry(getToday().minus(1), Entry.YES_MANUAL))
         h.recompute()
-        assertEquals(Entry.YES_AUTO, h.computedEntries.get(getToday()).value, "setup")
+        assertEquals(Entry.YES_AUTO, h.computedEntries.get(getToday()).state, "setup")
         assertEquals(DayStatus.MET, h.todayStatus())
     }
 
@@ -351,13 +351,13 @@ class HabitTest : BaseUnitTest() {
         recompute()
     }
 
-    private fun Habit.withEntryOn(date: LocalDate, value: Int) {
-        originalEntries.add(Entry(date, value))
+    private fun Habit.withEntryOn(date: LocalDate, state: Int) {
+        originalEntries.add(Entry(date, state))
         recompute()
     }
 
-    private fun Habit.withEntryToday(value: Int) {
-        originalEntries.add(Entry(getToday(), value))
+    private fun Habit.withEntryToday(state: Int) {
+        originalEntries.add(Entry(getToday(), state))
         recompute()
     }
 

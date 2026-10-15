@@ -94,12 +94,14 @@ class ShowHabitMenuPresenter(
         for (i in 0 until 365 * 5) {
             if (i % 7 == 0) strength = max(0.0, min(100.0, strength + 10 * nextGaussian()))
             if (kotlin.random.Random.nextInt(100) > strength) continue
-            var value = Entry.YES_MANUAL
-            if (habit.isNumerical) {
-                value =
-                    (1000 + 250 * nextGaussian() * strength / 100).toInt() * 1000
+            val date = getToday().minus(i)
+            val entry = if (habit.isNumerical) {
+                val amount = (1000 + 250 * nextGaussian() * strength / 100).toInt() * 1000
+                Entry(date, Entry.AMOUNT, amount)
+            } else {
+                Entry(date, Entry.YES_MANUAL)
             }
-            habit.originalEntries.add(Entry(getToday().minus(i), value))
+            habit.originalEntries.add(entry)
         }
         habit.recompute()
         screen.refresh()

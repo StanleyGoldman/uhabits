@@ -90,7 +90,7 @@ class CheckmarkButtonView(
 
     fun performToggle() {
         value = Entry.nextToggleValue(
-            value = value,
+            state = value,
             isSkipEnabled = preferences.isSkipEnabled,
             areQuestionMarksEnabled = preferences.areQuestionMarksEnabled
         )

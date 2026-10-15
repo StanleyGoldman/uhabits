@@ -72,8 +72,8 @@ class ImportTest : BaseUnitTest() {
         assertEquals(HabitType.NUMERICAL, habit.type)
         assertEquals("", habit.description)
         assertEquals(Frequency.DAILY, habit.frequency)
-        assertEquals(30000, getValue(habit, 2021, 9, 1))
-        assertEquals(100000, getValue(habit, 2022, 1, 8))
+        assertEquals(30000, getAmount(habit, 2021, 9, 1))
+        assertEquals(100000, getAmount(habit, 2022, 1, 8))
 
         val habit2 = habitList.getByPosition(1)
         assertEquals("run", habit2.name)
@@ -95,8 +95,8 @@ class ImportTest : BaseUnitTest() {
         assertEquals(HabitType.NUMERICAL, habit.type)
         assertEquals("", habit.description)
         assertEquals(Frequency.DAILY, habit.frequency)
-        assertEquals(80000, getValue(habit, 2022, 11, 21))
-        assertEquals(80000, getValue(habit, 2022, 11, 22))
+        assertEquals(80000, getAmount(habit, 2022, 11, 21))
+        assertEquals(80000, getAmount(habit, 2022, 11, 22))
     }
 
     @Test
@@ -199,11 +199,11 @@ class ImportTest : BaseUnitTest() {
     }
 
     private fun isChecked(h: Habit, year: Int, month: Int, day: Int): Boolean {
-        return getValue(h, year, month, day) == Entry.YES_MANUAL
+        return h.originalEntries.get(LocalDate(year, month, day)).state == Entry.YES_MANUAL
     }
 
-    private fun getValue(h: Habit, year: Int, month: Int, day: Int): Int {
-        return h.originalEntries.get(LocalDate(year, month, day)).value
+    private fun getAmount(h: Habit, year: Int, month: Int, day: Int): Int? {
+        return h.originalEntries.get(LocalDate(year, month, day)).amount
     }
 
     private fun isNotesEqual(h: Habit, year: Int, month: Int, day: Int, notes: String): Boolean {

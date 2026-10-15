@@ -134,20 +134,11 @@ open class MemoryHabitList : HabitList {
             Comparator { h1: Habit, h2: Habit -> scoreComparatorDesc.compare(h2, h1) }
         val positionComparator =
             Comparator<Habit> { habit1, habit2 -> habit1.position.compareTo(habit2.position) }
-        val statusComparatorDesc = Comparator { h1: Habit, h2: Habit ->
-            val met1 = h1.todayStatus() == DayStatus.MET
-            val met2 = h2.todayStatus() == DayStatus.MET
-            if (met1 != met2) {
-                return@Comparator if (met1) -1 else 1
-            }
-            if (h1.isNumerical != h2.isNumerical) {
-                return@Comparator if (h1.isNumerical) -1 else 1
-            }
-            val today = org.isoron.platform.time.getToday()
-            val v1 = h1.computedEntries.get(today).value
-            val v2 = h2.computedEntries.get(today).value
-            v2.compareTo(v1)
-        }
+        // Met, then missed, then open, so the default (ascending) order shows what is
+        // still open first; measurable before yes-or-no within each
+        val statusRank = listOf(DayStatus.MET, DayStatus.MISSED, DayStatus.OPEN)
+        val statusComparatorDesc = compareBy<Habit> { statusRank.indexOf(it.todayStatus()) }
+            .thenBy { !it.isNumerical }
         val statusComparatorAsc =
             Comparator { h1: Habit, h2: Habit -> statusComparatorDesc.compare(h2, h1) }
         return when {

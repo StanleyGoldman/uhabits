@@ -100,7 +100,7 @@ class HabitFixtures(
         val values = intArrayOf(100, 200, 300, 400, 500, 600, 700, 800)
         for (i in times.indices) {
             val timestamp = today.minus(times[i])
-            habit.originalEntries.add(Entry(timestamp, values[i]))
+            habit.originalEntries.add(Entry(timestamp, Entry.AMOUNT, values[i]))
         }
         habit.recompute()
         return habit
@@ -135,7 +135,7 @@ class HabitFixtures(
         )
         for (i in times.indices) {
             val timestamp = reference.minus(times[i])
-            habit.originalEntries.add(Entry(timestamp, values[i]))
+            habit.originalEntries.add(Entry(timestamp, Entry.AMOUNT, values[i]))
         }
         habit.recompute()
         return habit
@@ -151,7 +151,7 @@ class HabitFixtures(
         for (i in NON_DAILY_HABIT_CHECKS.indices) {
             var value = Entry.NO
             if (NON_DAILY_HABIT_CHECKS[i]) value = Entry.YES_MANUAL
-            habit.originalEntries.add(Entry(timestamp, value, NON_DAILY_HABIT_NOTES[i]))
+            habit.originalEntries.add(Entry(timestamp, value, notes = NON_DAILY_HABIT_NOTES[i]))
             timestamp = timestamp.minus(1)
         }
         habit.recompute()

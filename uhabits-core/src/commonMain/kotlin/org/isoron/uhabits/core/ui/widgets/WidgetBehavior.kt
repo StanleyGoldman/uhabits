@@ -39,30 +39,29 @@ class WidgetBehavior(
     fun onAddRepetition(habit: Habit, date: LocalDate) {
         notificationTray.cancel(habit)
         val entry = habit.originalEntries.get(date)
-        setValue(habit, date, Entry.YES_MANUAL, entry.notes)
+        setState(habit, date, Entry.YES_MANUAL, entry.notes)
     }
 
     fun onRemoveRepetition(habit: Habit, date: LocalDate) {
         notificationTray.cancel(habit)
         val entry = habit.originalEntries.get(date)
-        setValue(habit, date, Entry.NO, entry.notes)
+        setState(habit, date, Entry.NO, entry.notes)
     }
 
     fun onToggleRepetition(habit: Habit, date: LocalDate) {
         val entry = habit.originalEntries.get(date)
-        val currentValue = entry.value
-        val newValue = nextToggleValue(
-            value = currentValue,
+        val newState = nextToggleValue(
+            state = entry.state,
             isSkipEnabled = preferences.isSkipEnabled,
             areQuestionMarksEnabled = preferences.areQuestionMarksEnabled
         )
-        setValue(habit, date, newValue, entry.notes)
+        setState(habit, date, newState, entry.notes)
         notificationTray.cancel(habit)
     }
 
     fun onIncrement(habit: Habit, date: LocalDate, amount: Int) {
         if (!habit.isNumerical) return
-        val entry = habit.computedEntries.get(date).toStateForm(isNumerical = true)
+        val entry = habit.computedEntries.get(date)
         val newAmount = (entry.amount ?: 0) + amount
         setAmount(habit, date, newAmount, entry.notes)
         notificationTray.cancel(habit)
@@ -70,7 +69,7 @@ class WidgetBehavior(
 
     fun onDecrement(habit: Habit, date: LocalDate, amount: Int) {
         if (!habit.isNumerical) return
-        val entry = habit.computedEntries.get(date).toStateForm(isNumerical = true)
+        val entry = habit.computedEntries.get(date)
         val currentAmount = entry.amount
         if (currentAmount != null) {
             val newAmount = maxOf(0, currentAmount - amount)
@@ -85,9 +84,9 @@ class WidgetBehavior(
         )
     }
 
-    fun setValue(habit: Habit, date: LocalDate, newValue: Int, notes: String) {
+    fun setState(habit: Habit, date: LocalDate, newState: Int, notes: String) {
         commandRunner.run(
-            CreateRepetitionCommand(habitList, habit, date, newValue, notes)
+            CreateRepetitionCommand(habitList, habit, date, newState, amount = null, notes = notes)
         )
     }
 }

@@ -74,6 +74,7 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
 - A red counts only when the failing assertion is the behaviour under test. Read its message (`failure message=` in `uhabits-core/build/test-results/jvmTest/*.xml`); a setup assertion failing proves nothing. Example: `HabitList` orders habits by name, so in `ImportTest` `getByPosition` follows alphabetical order, not file order.
 - Hand checks of a screen run on the emulator; read `docs/agents/emulator.md` before the first `adb` call.
 - Record or re-record an Android view screenshot baseline by following `docs/agents/screenshot-tests.md`.
+- A `uhabits-core` render (`assertRenders`) compares luminosity only, within 2px and a 1% average, so it stays green when a thin or small mark goes missing, or a colour changes at the same brightness. Red-check every mark a slice adds; when the render stays green, assert the mark's colour on `canvas.toImage().getPixel(x, y)` instead.
 
 ### Pull requests
 

@@ -22,19 +22,30 @@ import dev.mokkery.mock
 import dev.mokkery.resetCalls
 import dev.mokkery.verify
 import dev.mokkery.verifyNoMoreCalls
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.isoron.platform.time.LocalDate
+import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.BaseUnitTest
 import org.isoron.uhabits.core.commands.CreateRepetitionCommand
 import org.isoron.uhabits.core.commands.DeleteHabitsCommand
 import org.isoron.uhabits.core.models.Entry
+import org.isoron.uhabits.core.models.Habit
+import org.isoron.uhabits.core.models.HabitMatcher
+import org.isoron.uhabits.core.ui.screens.habits.list.HabitCardListCache.Companion.GRACE_PERIOD
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 class HabitCardListCacheTest : BaseUnitTest() {
     private lateinit var cache: HabitCardListCache
     private lateinit var listener: HabitCardListCache.Listener
+    private val scheduler = TestCoroutineScheduler()
     var today = LocalDate(2015, 1, 25)
 
     @BeforeTest
@@ -44,7 +55,7 @@ class HabitCardListCacheTest : BaseUnitTest() {
         for (i in 0..9) {
             if (i == 3) habitList.add(fixtures.createLongHabit()) else habitList.add(fixtures.createShortHabit())
         }
-        cache = HabitCardListCache(habitList, commandRunner, taskRunner, mock())
+        cache = HabitCardListCache(habitList, commandRunner, taskRunner, mock(), StandardTestDispatcher(scheduler))
         cache.setCheckmarkCount(10)
         cache.refreshAllHabits()
         cache.onAttached()
@@ -144,6 +155,94 @@ class HabitCardListCacheTest : BaseUnitTest() {
         verify { listener.onItemMoved(7, 6) }
         verify { listener.onRefreshFinished() }
         verifyNoMoreCalls(listener)
+    }
+
+    @Test
+    fun testGracePeriod_keepsToggledRowVisibleUntilItExpires() {
+        val h = addHabitHiddenOnceEntered()
+        toggle(h, Entry.YES_MANUAL)
+        assertTrue(isVisible(h))
+        advanceBy(GRACE_PERIOD - 1.milliseconds)
+        assertTrue(isVisible(h))
+        advanceBy(1.milliseconds)
+        assertFalse(isVisible(h))
+    }
+
+    @Test
+    fun testGracePeriod_eachTapRestartsTheTimer() {
+        val h = addHabitHiddenOnceEntered()
+        toggle(h, Entry.YES_MANUAL)
+        advanceBy(GRACE_PERIOD / 2)
+        toggle(h, Entry.SKIP, date = getToday().minus(1))
+        advanceBy(GRACE_PERIOD - 1.milliseconds)
+        assertTrue(isVisible(h))
+        advanceBy(1.milliseconds)
+        assertFalse(isVisible(h))
+    }
+
+    @Test
+    fun testGracePeriod_onlyHoldsTheTappedRow() {
+        val h = addHabitHiddenOnceEntered()
+        val other = addHabitHiddenOnceEntered()
+        toggle(h, Entry.YES_MANUAL)
+        commandRunner.run(CreateRepetitionCommand(habitList, other, getToday(), Entry.YES_MANUAL, ""))
+        assertTrue(isVisible(h))
+        assertFalse(isVisible(other))
+    }
+
+    @Test
+    fun testGracePeriod_endingItAppliesHideRulesImmediately() {
+        val h = addHabitHiddenOnceEntered()
+        toggle(h, Entry.YES_MANUAL)
+        cache.endGracePeriod(h.id!!)
+        assertFalse(isVisible(h))
+        advanceBy(GRACE_PERIOD)
+        assertFalse(isVisible(h))
+    }
+
+    @Test
+    fun testHoldUntilEnded_outlastsAnEarlierTimer() {
+        val h = addHabitHiddenOnceEntered()
+        toggle(h, Entry.YES_MANUAL)
+        cache.holdUntilEnded(h.id!!)
+        advanceBy(GRACE_PERIOD * 10)
+        assertTrue(isVisible(h))
+        cache.endGracePeriod(h.id!!)
+        assertFalse(isVisible(h))
+    }
+
+    @Test
+    fun testOnDetached_endsAllGracePeriods() {
+        val h = addHabitHiddenOnceEntered()
+        cache.holdUntilEnded(h.id!!)
+        commandRunner.run(CreateRepetitionCommand(habitList, h, getToday(), Entry.YES_MANUAL, ""))
+        assertTrue(isVisible(h))
+        cache.onDetached()
+        cache.refreshAllHabits()
+        assertFalse(isVisible(h))
+    }
+
+    private fun addHabitHiddenOnceEntered(): Habit {
+        val h = fixtures.createEmptyHabit()
+        habitList.add(h)
+        cache.setFilter(HabitMatcher(isEnteredAllowed = false))
+        cache.refreshAllHabits()
+        assertTrue(isVisible(h))
+        return h
+    }
+
+    private fun toggle(h: Habit, value: Int, date: LocalDate = getToday()) {
+        cache.startGracePeriod(h.id!!)
+        commandRunner.run(CreateRepetitionCommand(habitList, h, date, value, ""))
+    }
+
+    private fun advanceBy(duration: Duration) {
+        scheduler.advanceTimeBy(duration)
+        scheduler.runCurrent()
+    }
+
+    private fun isVisible(h: Habit): Boolean {
+        return (0 until cache.habitCount).any { cache.getHabitByPosition(it) == h }
     }
 
     private fun removeHabitAt(position: Int) {

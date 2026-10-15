@@ -18,6 +18,7 @@
  */
 package org.isoron.uhabits.core.models
 
+import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.BaseUnitTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -91,6 +92,51 @@ class HabitMatcherTest : BaseUnitTest() {
 
         // No match
         assertMatches(habits, "swimming", emptyList())
+    }
+
+    @Test
+    fun testHideEntered_keepsHabitsWithNothingRecordedToday() {
+        val untouched = buildHabit("Untouched")
+        val unknown = buildHabit("Unknown").withEntryToday(Entry.UNKNOWN)
+        val autoOnly = buildHabit("Auto only").apply {
+            frequency = Frequency(3, 7)
+            for (daysAgo in 1..3) originalEntries.add(Entry(getToday().minus(daysAgo), Entry.YES_MANUAL))
+            recompute()
+        }
+        assertEquals(Entry.YES_AUTO, autoOnly.computedEntries.get(getToday()).value)
+        val measurableUntouched = buildMeasurableHabit("Measurable untouched")
+        val measurableUnknown = buildMeasurableHabit("Measurable unknown").withEntryToday(Entry.UNKNOWN)
+
+        val habits = listOf(untouched, unknown, autoOnly, measurableUntouched, measurableUnknown)
+        assertEquals(habits, habits.filter(HabitMatcher(isEnteredAllowed = false)::matches))
+    }
+
+    @Test
+    fun testHideEntered_hidesHabitsWithSomethingRecordedToday() {
+        val yes = buildHabit("Yes").withEntryToday(Entry.YES_MANUAL)
+        val no = buildHabit("No").withEntryToday(Entry.NO)
+        val skip = buildHabit("Skip").withEntryToday(Entry.SKIP)
+        val amount = buildMeasurableHabit("Amount").withEntryToday(5000)
+        val zero = buildMeasurableHabit("Zero").withEntryToday(0)
+        val tinyAmount = buildMeasurableHabit("0.001").withEntryToday(1)
+        val measurableSkip = buildMeasurableHabit("Measurable skip").withEntryToday(Entry.SKIP)
+
+        val habits = listOf(yes, no, skip, amount, zero, tinyAmount, measurableSkip)
+        assertEquals(emptyList(), habits.filter(HabitMatcher(isEnteredAllowed = false)::matches))
+    }
+
+    private fun buildMeasurableHabit(name: String): Habit {
+        return buildHabit(name).apply {
+            type = HabitType.NUMERICAL
+            targetType = NumericalHabitType.AT_LEAST
+            targetValue = 10.0
+        }
+    }
+
+    private fun Habit.withEntryToday(value: Int): Habit {
+        originalEntries.add(Entry(getToday(), value))
+        recompute()
+        return this
     }
 
     private fun assertMatches(habits: List<Habit>, query: String, expected: List<Habit>) {

@@ -101,6 +101,9 @@ _Avoid_: Done, checked
 **Entered (today)**:
 A habit for which the user recorded something today: a yes, a no, a skip or an amount. Unknown and Yes (auto) are not entered. Used by "Hide entered".
 
+**Grace period**:
+The time a toggled row stays on the main list although "Hide completed" or "Hide entered" would hide it: about 2 s after the last toggle on any of its days, or until its long-press popup or number dialog closes.
+
 ### Progress
 
 **Score**:

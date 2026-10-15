@@ -47,17 +47,21 @@ open class ListHabitsBehavior(
     private val screen: Screen,
     private val commandRunner: CommandRunner,
     private val prefs: Preferences,
-    private val bugReporter: BugReporter
+    private val bugReporter: BugReporter,
+    private val cache: HabitCardListCache
 ) {
     open fun onClickHabit(h: Habit) {
         screen.showHabitScreen(h)
     }
 
     open fun onEdit(habit: Habit, date: LocalDate, x: Float, y: Float) {
+        // Keep the row while the popup is open; closing it applies the hide rules
+        habit.id?.let { cache.holdUntilEnded(it) }
+        val onDismiss = { habit.id?.let { cache.endGracePeriod(it) } ?: Unit }
         val entry = habit.computedEntries.get(date)
         if (habit.type == HabitType.NUMERICAL) {
             val oldValue = entry.value.toDouble() / 1000
-            screen.showNumberPopup(oldValue, entry.notes) { newValue: Double, newNotes: String ->
+            screen.showNumberPopup(oldValue, entry.notes, onDismiss) { newValue: Double, newNotes: String ->
                 val value = (newValue * 1000).roundToInt()
                 if (newValue != oldValue) {
                     if (
@@ -73,7 +77,8 @@ open class ListHabitsBehavior(
             screen.showCheckmarkPopup(
                 entry.value,
                 entry.notes,
-                habit.color
+                habit.color,
+                onDismiss
             ) { newValue: Int, newNotes: String ->
                 if (newValue != entry.value && newValue == YES_MANUAL) screen.showConfetti(habit.color, x, y)
                 commandRunner.run(CreateRepetitionCommand(habitList, habit, date, newValue, newNotes))
@@ -133,6 +138,7 @@ open class ListHabitsBehavior(
     }
 
     open fun onToggle(habit: Habit, date: LocalDate, value: Int, notes: String, x: Float, y: Float) {
+        habit.id?.let { cache.startGracePeriod(it) }
         commandRunner.run(
             CreateRepetitionCommand(habitList, habit, date, value, notes)
         )
@@ -165,12 +171,14 @@ open class ListHabitsBehavior(
         fun showNumberPopup(
             value: Double,
             notes: String,
+            onDismiss: () -> Unit,
             callback: NumberPickerCallback
         )
         fun showCheckmarkPopup(
             selectedValue: Int,
             notes: String,
             color: PaletteColor,
+            onDismiss: () -> Unit,
             callback: CheckMarkDialogCallback
         )
         fun showSendBugReportToDeveloperScreen(log: String)

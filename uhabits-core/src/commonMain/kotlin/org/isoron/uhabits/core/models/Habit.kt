@@ -100,19 +100,28 @@ data class Habit(
                 else -> DayStatus.MISSED
             }
         }
-        return judge(entry.amount!!.toLong(), (targetValue * 1000).roundToLong(), isClosed)
+        return judge(entry.amount!!.toLong(), targetX1000(), isClosed)
     }
+
+    /** The target or cap ×1000, the scale amounts are stored in. */
+    private fun targetX1000(): Long = (targetValue * 1000).roundToLong()
 
     /**
      * Judges a total against a target or cap, both scaled to the same days.
      * An "at least" total is met on reaching the target and missed only once
      * closed; an "at most" total is missed on going over the cap and met only
-     * once closed.
+     * once closed. With [isEntered] false nothing was entered, which never
+     * meets an "at least" target, not even a target of 0.
      */
-    private fun judge(total: Long, target: Long, isClosed: Boolean): DayStatus {
+    private fun judge(
+        total: Long,
+        target: Long,
+        isClosed: Boolean,
+        isEntered: Boolean = true
+    ): DayStatus {
         return when (targetType) {
             NumericalHabitType.AT_LEAST -> when {
-                total >= target -> DayStatus.MET
+                isEntered && total >= target -> DayStatus.MET
                 isClosed -> DayStatus.MISSED
                 else -> DayStatus.OPEN
             }
@@ -127,15 +136,20 @@ data class Habit(
     /**
      * The days whose total is judged against the target on [date]: the
      * calendar week or month holding it, the rolling window of the last 7 or
-     * 30 days ending on it, or null for a daily habit.
+     * 30 days ending on it, or null for a daily habit. A monthly habit may be
+     * stored as 1/30 or 1/31; either way its rolling window is 30 days.
      */
     private fun targetPeriod(date: LocalDate): ClosedRange<LocalDate>? {
-        val length = frequency.denominator
-        if (length != 7 && length != 30 && length != 31) return null
-        if (targetPeriodMode == TargetPeriodMode.ROLLING) return date.minus(length - 1)..date
-        return when (length) {
-            7 -> date.startOfWeek(getFirstWeekday()).let { it..it.plus(6) }
-            30, 31 -> date.startOfMonth().let { it..it.plus(it.monthLength - 1) }
+        val isRolling = targetPeriodMode == TargetPeriodMode.ROLLING
+        return when (frequency.denominator) {
+            7 -> when {
+                isRolling -> date.minus(6)..date
+                else -> date.startOfWeek(getFirstWeekday()).let { it..it.plus(6) }
+            }
+            30, 31 -> when {
+                isRolling -> date.minus(29)..date
+                else -> date.startOfMonth().let { it..it.plus(it.monthLength - 1) }
+            }
             else -> null
         }
     }
@@ -153,9 +167,13 @@ data class Habit(
         val days = period.start.daysUntil(period.endInclusive) + 1L
         val daysThatCount = days - entries.count { it.state == Entry.SKIP }
         if (daysThatCount == 0L) return null
-        val total = entries.filter { it.state == Entry.AMOUNT }.sumOf { it.amount!!.toLong() }
-        val scaledTarget = (targetValue * 1000).roundToLong() * daysThatCount
-        return judge(total * days, scaledTarget, isClosed = period.endInclusive < getToday())
+        val amounts = entries.filter { it.state == Entry.AMOUNT }.map { it.amount!!.toLong() }
+        return judge(
+            total = amounts.sum() * days,
+            target = targetX1000() * daysThatCount,
+            isClosed = period.endInclusive < getToday(),
+            isEntered = amounts.isNotEmpty()
+        )
     }
 
     fun isEnteredToday(): Boolean {

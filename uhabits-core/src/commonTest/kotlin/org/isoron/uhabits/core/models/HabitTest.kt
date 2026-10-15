@@ -304,6 +304,26 @@ class HabitTest : BaseUnitTest() {
     }
 
     @Test
+    fun test_statusOn_rollingMonthIs30DaysWhenStoredAs31() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 10.0)
+        h.frequency = Frequency(1, 31)
+        h.targetPeriodMode = TargetPeriodMode.ROLLING
+        h.withAmountOn(LocalDate(2014, 12, 26), 10.0)
+        assertEquals(DayStatus.MET, h.statusOn(LocalDate(2015, 1, 24)), "2014-12-26..2015-01-24")
+        assertEquals(DayStatus.OPEN, h.todayStatus(), "2014-12-27..2015-01-25")
+    }
+
+    @Test
+    fun test_statusOn_zeroTarget_nothingEnteredIsNotMet() {
+        val h = buildMeasurableHabit(NumericalHabitType.AT_LEAST, 0.0)
+        h.frequency = Frequency.WEEKLY
+        assertEquals(DayStatus.OPEN, h.todayStatus(), "open week")
+        assertEquals(DayStatus.MISSED, h.statusOn(LocalDate(2015, 1, 20)), "closed week")
+        h.withAmountToday(0.0)
+        assertEquals(DayStatus.MET, h.todayStatus(), "an amount of 0 reaches it")
+    }
+
+    @Test
     fun test_isEntered() {
         val h = modelFactory.buildHabit()
         assertFalse(h.isEnteredToday())

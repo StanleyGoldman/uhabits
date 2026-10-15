@@ -133,16 +133,8 @@ class HistoryCardPresenter(
             field = NumberField.of(entry),
             notes = entry.notes
         ) { input, newNotes ->
-            val newEntry = input.toEntry(entry, newNotes)
             commandRunner.run(
-                CreateRepetitionCommand(
-                    habitList,
-                    habit,
-                    date,
-                    newEntry.state,
-                    newEntry.notes,
-                    newEntry.amount
-                )
+                CreateRepetitionCommand(habitList, habit, input.toEntry(entry, newNotes))
             )
         }
     }

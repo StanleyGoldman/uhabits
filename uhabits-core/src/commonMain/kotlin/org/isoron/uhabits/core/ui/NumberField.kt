@@ -19,7 +19,7 @@
 package org.isoron.uhabits.core.ui
 
 import org.isoron.uhabits.core.models.Entry
-import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * What the number dialog shows for one day of a measurable habit: the amount
@@ -48,7 +48,7 @@ data class NumberField(val text: String, val isSkipped: Boolean) {
 
 /** What the user did in the number dialog. */
 sealed interface NumberInput {
-    /** Saved the field with [text] in it, which may be empty. */
+    /** Saved the field with [text] in it, which may be empty; "." or "," marks decimals. */
     data class Typed(val text: String) : NumberInput
     data object Skip : NumberInput
     data object Unknown : NumberInput
@@ -58,15 +58,21 @@ sealed interface NumberInput {
         val before = previous.toStateForm(isNumerical = true).copy(notes = notes)
         return when (this) {
             is Typed -> {
-                val number = text.toDoubleOrNull()
+                val decimal = text.replace(',', '.')
+                val number = decimal.toDoubleOrNull()
                 when {
                     text.isEmpty() && before.amount != null -> before.copy(state = Entry.UNKNOWN, amount = null)
-                    number == null || text == NumberField.of(previous).text -> before
-                    else -> before.copy(state = Entry.AMOUNT, amount = (number * 100).roundToInt() * 10)
+                    number == null || decimal == NumberField.of(previous).text -> before
+                    else -> before.copy(state = Entry.AMOUNT, amount = toAmount(number))
                 }
             }
             Skip -> before.copy(state = Entry.SKIP, amount = null)
             Unknown -> before.copy(state = Entry.UNKNOWN, amount = null)
         }
+    }
+
+    private fun toAmount(number: Double): Int {
+        val thousandths = (number * 100).roundToLong() * 10
+        return thousandths.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
 }

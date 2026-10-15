@@ -13,6 +13,7 @@ import android.view.inputmethod.EditorInfo
 import androidx.appcompat.app.AppCompatDialogFragment
 import org.isoron.uhabits.HabitsApplication
 import org.isoron.uhabits.R
+import org.isoron.uhabits.core.ui.NumberField
 import org.isoron.uhabits.core.ui.NumberInput
 import org.isoron.uhabits.databinding.CheckmarkPopupBinding
 import org.isoron.uhabits.utils.InterfaceUtils
@@ -48,11 +49,11 @@ class NumberDialog : AppCompatDialogFragment() {
         if (!prefs.areQuestionMarksEnabled) view.unknownBtnNumber.visibility = View.GONE
         view.numberButtons.visibility = View.VISIBLE
         fixDecimalSeparator(view)
-        originalNotes = requireArguments().getString("notes")!!
-        originalText = requireArguments().getString("text")!!.replace('.', separator)
+        originalNotes = requireArguments().getString(ARG_NOTES)!!
+        originalText = requireArguments().getString(ARG_TEXT)!!.replace('.', separator)
         view.notes.setText(originalNotes)
         view.value.setText(originalText)
-        if (requireArguments().getBoolean("skipped")) view.value.setHint(R.string.skipped)
+        if (requireArguments().getBoolean(ARG_SKIPPED)) view.value.setHint(R.string.skipped)
         view.value.setOnKeyListener { _, keyCode, event ->
             if (event.action == MotionEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_ENTER) {
                 save()
@@ -90,7 +91,7 @@ class NumberDialog : AppCompatDialogFragment() {
         if (!dismissedViaSaveAction) {
             val currentNotes = view.notes.text.toString().trim()
             if (currentNotes != originalNotes) {
-                onToggle(typed(originalText), currentNotes)
+                onToggle(NumberInput.Typed(originalText), currentNotes)
             }
         }
         onDismiss()
@@ -110,12 +111,24 @@ class NumberDialog : AppCompatDialogFragment() {
         }
     }
 
-    fun save(input: NumberInput = typed(view.value.text.toString())) {
+    fun save(input: NumberInput = NumberInput.Typed(view.value.text.toString())) {
         dismissedViaSaveAction = true
         val notes = view.notes.text.toString().trim()
         onToggle(input, notes)
         requireDialog().dismiss()
     }
 
-    private fun typed(text: String) = NumberInput.Typed(text.replace(separator, '.'))
+    companion object {
+        private const val ARG_TEXT = "text"
+        private const val ARG_SKIPPED = "skipped"
+        private const val ARG_NOTES = "notes"
+
+        fun newInstance(field: NumberField, notes: String) = NumberDialog().apply {
+            arguments = Bundle().apply {
+                putString(ARG_TEXT, field.text)
+                putBoolean(ARG_SKIPPED, field.isSkipped)
+                putString(ARG_NOTES, notes)
+            }
+        }
+    }
 }

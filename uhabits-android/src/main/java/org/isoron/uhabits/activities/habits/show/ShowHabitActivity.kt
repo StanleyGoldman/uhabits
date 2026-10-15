@@ -178,12 +178,7 @@ class ShowHabitActivity : AppCompatActivity(), CommandRunner.Listener {
             notes: String,
             callback: NumberPickerCallback
         ) {
-            val dialog = NumberDialog()
-            dialog.arguments = Bundle().apply {
-                putString("text", field.text)
-                putBoolean("skipped", field.isSkipped)
-                putString("notes", notes)
-            }
+            val dialog = NumberDialog.newInstance(field, notes)
             dialog.onToggle = { v, n -> callback.onNumberPicked(v, n) }
             dialog.dismissCurrentAndShow(supportFragmentManager, "numberDialog")
         }

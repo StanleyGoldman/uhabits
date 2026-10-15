@@ -63,7 +63,7 @@ open class ListHabitsBehavior(
             screen.showNumberPopup(NumberField.of(entry), entry.notes, onDismiss) { input, newNotes ->
                 val newEntry = input.toEntry(entry, newNotes)
                 val newAmount = newEntry.amount
-                if (newAmount != null && newAmount != entry.amount) {
+                if (newAmount != null && newAmount != entry.toStateForm(isNumerical = true).amount) {
                     val newValue = newAmount / 1000.0
                     if (
                         (habit.targetType == AT_LEAST && newValue >= habit.targetValue) ||
@@ -72,9 +72,7 @@ open class ListHabitsBehavior(
                         screen.showConfetti(habit.color, x, y)
                     }
                 }
-                commandRunner.run(
-                    CreateRepetitionCommand(habitList, habit, date, newEntry.state, newEntry.notes, newEntry.amount)
-                )
+                commandRunner.run(CreateRepetitionCommand(habitList, habit, newEntry))
             }
         } else {
             screen.showCheckmarkPopup(

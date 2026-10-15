@@ -265,12 +265,7 @@ class ListHabitsScreen(
         callback: NumberPickerCallback
     ) {
         val fm = (context as AppCompatActivity).supportFragmentManager
-        val dialog = NumberDialog()
-        dialog.arguments = Bundle().apply {
-            putString("text", field.text)
-            putBoolean("skipped", field.isSkipped)
-            putString("notes", notes)
-        }
+        val dialog = NumberDialog.newInstance(field, notes)
         dialog.onToggle = { v, n -> callback.onNumberPicked(v, n) }
         dialog.onDismiss = onDismiss
         dialog.dismissCurrentAndShow(fm, "numberDialog")

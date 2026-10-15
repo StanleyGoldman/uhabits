@@ -26,6 +26,7 @@ import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import dev.mokkery.spy
 import dev.mokkery.verify
+import dev.mokkery.verify.VerifyMode
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.runTest
@@ -274,6 +275,34 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
         val (field, picker) = openNumberPopup(Entry(getToday(), Entry.AMOUNT, 1235))
         picker.onNumberPicked(NumberInput.Typed(field.text), "")
         assertEquals(Entry(getToday(), Entry.AMOUNT, 1235), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_aHugeAmountIsCappedNotWrapped() {
+        val (_, picker) = openNumberPopup(Entry(getToday(), Entry.UNKNOWN, null))
+        picker.onNumberPicked(NumberInput.Typed("3000000"), "")
+        assertEquals(Entry(getToday(), Entry.AMOUNT, Int.MAX_VALUE), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_aCommaWorksAsTheDecimalPoint() {
+        val (_, picker) = openNumberPopup(Entry(getToday(), Entry.UNKNOWN, null))
+        picker.onNumberPicked(NumberInput.Typed("1,5"), "")
+        assertEquals(Entry(getToday(), Entry.AMOUNT, 1500), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_savingAnUntouchedFieldWithACommaKeepsTheAmount() {
+        openNumberPopup(Entry(getToday(), Entry.AMOUNT, 1235)).second
+            .onNumberPicked(NumberInput.Typed("1,24"), "")
+        assertEquals(Entry(getToday(), Entry.AMOUNT, 1235), todayEntry())
+    }
+
+    @Test
+    fun testOnEdit_savingAnUntouchedOldFormAmountShowsNoConfetti() {
+        val (field, picker) = openNumberPopup(Entry(getToday(), 2500))
+        picker.onNumberPicked(NumberInput.Typed(field.text), "")
+        verify(VerifyMode.not) { screen.showConfetti(any(), any(), any()) }
     }
 
     private fun addHabitHiddenOnceEntered(): Habit {

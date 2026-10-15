@@ -24,6 +24,7 @@ import android.content.Context
 import android.view.View
 import org.isoron.platform.gui.toInt
 import org.isoron.platform.time.getToday
+import org.isoron.uhabits.core.models.DayStatus
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.ui.views.WidgetTheme
@@ -72,7 +73,7 @@ open class CheckmarkWidget(
     }
 
     private fun getNumericalEntryState(): Int {
-        return if (habit.isCompletedToday()) {
+        return if (habit.todayStatus() == DayStatus.MET) {
             Entry.YES_MANUAL
         } else {
             Entry.NO

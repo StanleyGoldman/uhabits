@@ -25,8 +25,8 @@ import org.isoron.uhabits.core.commands.Command
 import org.isoron.uhabits.core.commands.CommandRunner
 import org.isoron.uhabits.core.commands.CreateRepetitionCommand
 import org.isoron.uhabits.core.commands.DeleteHabitsCommand
+import org.isoron.uhabits.core.models.DayStatus
 import org.isoron.uhabits.core.models.Habit
-import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.tasks.Task
 import org.isoron.uhabits.core.tasks.TaskRunner
@@ -109,18 +109,18 @@ open class NotificationTray(
     internal class NotificationData(val date: LocalDate, val reminderTime: Long)
     private inner class ShowNotificationTask(private val habit: Habit, data: NotificationData) :
         Task {
-        var isCompleted = false
+        var status = DayStatus.OPEN
         private val date: LocalDate = data.date
         private val reminderTime: Long = data.reminderTime
 
         override suspend fun doInBackground() {
-            isCompleted = habit.isCompletedToday()
+            status = habit.todayStatus()
         }
 
         override fun onPostExecute() {
             systemTray.log("Showing notification for habit=" + habit.id)
-            if (isCompleted && habit.targetType != NumericalHabitType.AT_MOST) {
-                systemTray.log("Habit ${habit.id} already checked. Skipping.")
+            if (status != DayStatus.OPEN) {
+                systemTray.log("Habit ${habit.id} already $status today. Skipping.")
                 return
             }
             if (!habit.hasReminder()) {

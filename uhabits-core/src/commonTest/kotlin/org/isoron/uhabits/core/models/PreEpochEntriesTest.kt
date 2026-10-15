@@ -44,7 +44,7 @@ class PreEpochEntriesTest : BaseUnitTest() {
             habit.streaks.getBest(1)
         )
         assertWeekdayCountsAroundEpoch(habit, expected = 1)
-        assertTrue(habit.isCompletedToday())
+        assertEquals(DayStatus.MET, habit.todayStatus())
     }
 
     @Test
@@ -52,7 +52,7 @@ class PreEpochEntriesTest : BaseUnitTest() {
         val habit = yesOrNoHabit(Frequency.THREE_TIMES_PER_WEEK)
         assertStreakSpansBothPreEpochDays(habit)
         assertWeekdayCountsAroundEpoch(habit, expected = 1)
-        assertTrue(habit.isCompletedToday())
+        assertEquals(DayStatus.MET, habit.todayStatus())
     }
 
     @Test
@@ -60,7 +60,7 @@ class PreEpochEntriesTest : BaseUnitTest() {
         val habit = yesOrNoHabit(Frequency(1, 30))
         assertStreakSpansBothPreEpochDays(habit)
         assertWeekdayCountsAroundEpoch(habit, expected = 1)
-        assertTrue(habit.isCompletedToday())
+        assertEquals(DayStatus.MET, habit.todayStatus())
     }
 
     @Test
@@ -74,7 +74,7 @@ class PreEpochEntriesTest : BaseUnitTest() {
         addEntriesAroundEpochAndToday(habit, THREE_UNITS)
         assertStreakSpansBothPreEpochDays(habit)
         assertWeekdayCountsAroundEpoch(habit, expected = THREE_UNITS)
-        assertTrue(habit.isCompletedToday())
+        assertEquals(DayStatus.MET, habit.todayStatus())
     }
 
     private fun yesOrNoHabit(frequency: Frequency): Habit {

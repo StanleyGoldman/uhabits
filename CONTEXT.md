@@ -100,9 +100,9 @@ _Avoid_: Numerical value, count
 **Toggle**:
 Cycling a yes-or-no entry through its values with one gesture on the main list or a widget.
 
-**Completed (today)**:
-A habit whose today's entry is a yes, a skip, or meets an "at least" target. Used by "Hide completed".
-_Avoid_: Done, checked
+**Day status**:
+How a habit stands on a day: **open** (still undecided), **met** or **missed**. A yes-or-no day is met by a yes (manual or auto) or a skip and missed by a no. A measurable day is met by a skip or by reaching an "at least" target, and missed by going over an "at most" cap; otherwise it stays open until the day closes. "Hide completed" hides habits met today, and sort by status puts them first.
+_Avoid_: Completed, done, checked
 
 **Entered (today)**:
 A habit for which the user recorded something today: a yes, a no, a skip or an amount. Unknown and Yes (auto) are not entered. Used by "Hide entered".
@@ -149,7 +149,7 @@ A measurable habit's amount so far in the current day, week, month, quarter and 
 ### Reminders
 
 **Reminder**:
-A notification for a habit at a chosen time on chosen days, asking its question. It stays quiet once the habit is completed for the day.
+A notification for a habit at a chosen time on chosen days, asking its question. It fires only while today's day status is open, so it stays quiet once the day is met or missed.
 _Avoid_: Alarm, notification
 
 **Snooze**:

@@ -60,16 +60,26 @@ data class Habit(
 
     fun hasReminder(): Boolean = reminder != null
 
-    fun isCompletedToday(): Boolean {
-        val today = getToday()
-        val value = computedEntries.get(today).value
-        return if (isNumerical) {
-            when (targetType) {
-                NumericalHabitType.AT_LEAST -> value / 1000.0 >= targetValue
-                NumericalHabitType.AT_MOST -> false
-            }
-        } else {
-            value != Entry.NO && value != Entry.UNKNOWN
+    fun todayStatus(): DayStatus {
+        val entry = computedEntries.get(getToday())
+        if (isNumerical) return measurableStatus(entry.toStateForm(isNumerical = true))
+        return when (entry.value) {
+            Entry.UNKNOWN -> DayStatus.OPEN
+            Entry.NO -> DayStatus.MISSED
+            else -> DayStatus.MET
+        }
+    }
+
+    private fun measurableStatus(entry: Entry): DayStatus {
+        if (entry.state == Entry.SKIP) return DayStatus.MET
+        val amount = (entry.amount ?: 0) / 1000.0
+        // A day is only missed below an "at least" target, or met under an
+        // "at most" cap, once it has closed, so today is never either.
+        return when (targetType) {
+            NumericalHabitType.AT_LEAST ->
+                if (amount >= targetValue) DayStatus.MET else DayStatus.OPEN
+            NumericalHabitType.AT_MOST ->
+                if (amount > targetValue) DayStatus.MISSED else DayStatus.OPEN
         }
     }
 

@@ -137,6 +137,34 @@ class HabitListTest : BaseUnitTest() {
     }
 
     @Test
+    fun testOrderByStatus_ranksMetHabitsFirst() {
+        val no = fixtures.createEmptyHabit("No").withEntryToday(Entry.NO)
+        val underCap = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_MOST)
+            .withEntryToday(1)
+        val yes = fixtures.createEmptyHabit("Yes").withEntryToday(Entry.YES_MANUAL)
+        val measurableSkip = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
+            .withEntryToday(Entry.SKIP)
+
+        val list = modelFactory.buildHabitList().apply {
+            add(no)
+            add(underCap)
+            add(yes)
+            add(measurableSkip)
+        }
+        list.primaryOrder = HabitList.Order.BY_STATUS_DESC
+        assertEquals(
+            listOf(measurableSkip, yes, underCap, no),
+            (0 until list.size()).map { list.getByPosition(it) }
+        )
+    }
+
+    private fun Habit.withEntryToday(value: Int): Habit {
+        originalEntries.add(Entry(org.isoron.platform.time.getToday(), value))
+        recompute()
+        return this
+    }
+
+    @Test
     fun testReorder() {
         val operations =
             arrayOf(intArrayOf(5, 2), intArrayOf(3, 7), intArrayOf(4, 4), intArrayOf(8, 3))

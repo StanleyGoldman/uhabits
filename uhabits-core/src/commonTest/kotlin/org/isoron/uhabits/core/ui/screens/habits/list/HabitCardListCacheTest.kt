@@ -32,12 +32,15 @@ import org.isoron.uhabits.core.commands.DeleteHabitsCommand
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitMatcher
+import org.isoron.uhabits.core.ui.screens.habits.list.HabitCardListCache.Companion.GRACE_PERIOD
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 class HabitCardListCacheTest : BaseUnitTest() {
     private lateinit var cache: HabitCardListCache
@@ -155,15 +158,13 @@ class HabitCardListCacheTest : BaseUnitTest() {
     }
 
     @Test
-    fun testGracePeriod_keepsToggledRowVisibleForTwoSeconds() {
+    fun testGracePeriod_keepsToggledRowVisibleUntilItExpires() {
         val h = addHabitHiddenOnceEntered()
         toggle(h, Entry.YES_MANUAL)
         assertTrue(isVisible(h))
-        scheduler.advanceTimeBy(1999)
-        scheduler.runCurrent()
+        advanceBy(GRACE_PERIOD - 1.milliseconds)
         assertTrue(isVisible(h))
-        scheduler.advanceTimeBy(1)
-        scheduler.runCurrent()
+        advanceBy(1.milliseconds)
         assertFalse(isVisible(h))
     }
 
@@ -171,13 +172,11 @@ class HabitCardListCacheTest : BaseUnitTest() {
     fun testGracePeriod_eachTapRestartsTheTimer() {
         val h = addHabitHiddenOnceEntered()
         toggle(h, Entry.YES_MANUAL)
-        scheduler.advanceTimeBy(1500)
+        advanceBy(GRACE_PERIOD / 2)
         toggle(h, Entry.SKIP, date = getToday().minus(1))
-        scheduler.advanceTimeBy(1500)
-        scheduler.runCurrent()
+        advanceBy(GRACE_PERIOD - 1.milliseconds)
         assertTrue(isVisible(h))
-        scheduler.advanceTimeBy(500)
-        scheduler.runCurrent()
+        advanceBy(1.milliseconds)
         assertFalse(isVisible(h))
     }
 
@@ -192,13 +191,34 @@ class HabitCardListCacheTest : BaseUnitTest() {
     }
 
     @Test
-    fun testGracePeriod_endingItAppliesFiltersImmediately() {
+    fun testGracePeriod_endingItAppliesHideRulesImmediately() {
         val h = addHabitHiddenOnceEntered()
         toggle(h, Entry.YES_MANUAL)
         cache.endGracePeriod(h.id!!)
         assertFalse(isVisible(h))
-        scheduler.advanceTimeBy(2000)
-        scheduler.runCurrent()
+        advanceBy(GRACE_PERIOD)
+        assertFalse(isVisible(h))
+    }
+
+    @Test
+    fun testHoldUntilEnded_outlastsAnEarlierTimer() {
+        val h = addHabitHiddenOnceEntered()
+        toggle(h, Entry.YES_MANUAL)
+        cache.holdUntilEnded(h.id!!)
+        advanceBy(GRACE_PERIOD * 10)
+        assertTrue(isVisible(h))
+        cache.endGracePeriod(h.id!!)
+        assertFalse(isVisible(h))
+    }
+
+    @Test
+    fun testOnDetached_endsAllGracePeriods() {
+        val h = addHabitHiddenOnceEntered()
+        cache.holdUntilEnded(h.id!!)
+        commandRunner.run(CreateRepetitionCommand(habitList, h, getToday(), Entry.YES_MANUAL, ""))
+        assertTrue(isVisible(h))
+        cache.onDetached()
+        cache.refreshAllHabits()
         assertFalse(isVisible(h))
     }
 
@@ -214,6 +234,11 @@ class HabitCardListCacheTest : BaseUnitTest() {
     private fun toggle(h: Habit, value: Int, date: LocalDate = getToday()) {
         cache.startGracePeriod(h.id!!)
         commandRunner.run(CreateRepetitionCommand(habitList, h, date, value, ""))
+    }
+
+    private fun advanceBy(duration: Duration) {
+        scheduler.advanceTimeBy(duration)
+        scheduler.runCurrent()
     }
 
     private fun isVisible(h: Habit): Boolean {

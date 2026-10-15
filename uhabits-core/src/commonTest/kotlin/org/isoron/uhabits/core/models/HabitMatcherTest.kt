@@ -105,8 +105,9 @@ class HabitMatcherTest : BaseUnitTest() {
         }
         assertEquals(Entry.YES_AUTO, autoOnly.computedEntries.get(getToday()).value)
         val measurableUntouched = buildMeasurableHabit("Measurable untouched")
+        val measurableUnknown = buildMeasurableHabit("Measurable unknown").withEntryToday(Entry.UNKNOWN)
 
-        val habits = listOf(untouched, unknown, autoOnly, measurableUntouched)
+        val habits = listOf(untouched, unknown, autoOnly, measurableUntouched, measurableUnknown)
         assertEquals(habits, habits.filter(HabitMatcher(isEnteredAllowed = false)::matches))
     }
 
@@ -117,8 +118,10 @@ class HabitMatcherTest : BaseUnitTest() {
         val skip = buildHabit("Skip").withEntryToday(Entry.SKIP)
         val amount = buildMeasurableHabit("Amount").withEntryToday(5000)
         val zero = buildMeasurableHabit("Zero").withEntryToday(0)
+        val tinyAmount = buildMeasurableHabit("0.001").withEntryToday(1)
+        val measurableSkip = buildMeasurableHabit("Measurable skip").withEntryToday(Entry.SKIP)
 
-        val habits = listOf(yes, no, skip, amount, zero)
+        val habits = listOf(yes, no, skip, amount, zero, tinyAmount, measurableSkip)
         assertEquals(emptyList(), habits.filter(HabitMatcher(isEnteredAllowed = false)::matches))
     }
 

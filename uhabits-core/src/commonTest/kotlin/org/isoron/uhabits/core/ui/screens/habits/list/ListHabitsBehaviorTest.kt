@@ -36,6 +36,7 @@ import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitMatcher
 import org.isoron.uhabits.core.preferences.Preferences
+import org.isoron.uhabits.core.ui.callbacks.CheckMarkDialogCallback
 import org.isoron.uhabits.core.ui.callbacks.NumberPickerCallback
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -85,14 +86,14 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
     fun testOnEdit() {
         val today = getToday()
         every {
-            screen.showNumberPopup(any(), any(), any())
+            screen.showNumberPopup(any(), any(), any(), any())
         } calls { args ->
-            capturedPicker = args.arg<NumberPickerCallback>(2)
+            capturedPicker = args.arg<NumberPickerCallback>(3)
             Unit
         }
         behavior.onEdit(habit2, today, 0f, 0f)
         verify {
-            screen.showNumberPopup(0.1, "", any())
+            screen.showNumberPopup(0.1, "", any(), any())
         }
         capturedPicker!!.onNumberPicked(100.0, "")
         assertEquals(100000, habit2.computedEntries.get(today).value)
@@ -187,17 +188,29 @@ class ListHabitsBehaviorTest : BaseUnitTest() {
         val h = addHabitHiddenOnceEntered()
         behavior.onToggle(h, getToday(), Entry.YES_MANUAL, "", 0f, 0f)
         assertTrue(isVisible(h))
-        scheduler.advanceTimeBy(2000)
+        scheduler.advanceTimeBy(HabitCardListCache.GRACE_PERIOD)
         scheduler.runCurrent()
         assertFalse(isVisible(h))
     }
 
     @Test
-    fun testOnEdit_endsGracePeriod() {
-        every { screen.showCheckmarkPopup(any(), any(), any(), any()) } returns Unit
+    fun testOnEdit_keepsRowVisibleUntilPopupCloses() {
+        var dismiss: (() -> Unit)? = null
+        var picked: CheckMarkDialogCallback? = null
+        every { screen.showCheckmarkPopup(any(), any(), any(), any(), any()) } calls { args ->
+            dismiss = args.arg<() -> Unit>(3)
+            picked = args.arg<CheckMarkDialogCallback>(4)
+            Unit
+        }
         val h = addHabitHiddenOnceEntered()
         behavior.onToggle(h, getToday(), Entry.YES_MANUAL, "", 0f, 0f)
         behavior.onEdit(h, getToday(), 0f, 0f)
+        scheduler.advanceTimeBy(HabitCardListCache.GRACE_PERIOD * 2)
+        scheduler.runCurrent()
+        assertTrue(isVisible(h))
+        picked!!.onNotesSaved(Entry.SKIP, "")
+        assertTrue(isVisible(h))
+        dismiss!!()
         assertFalse(isVisible(h))
     }
 

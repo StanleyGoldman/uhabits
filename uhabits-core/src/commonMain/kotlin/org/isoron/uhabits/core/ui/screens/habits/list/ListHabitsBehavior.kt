@@ -55,12 +55,13 @@ open class ListHabitsBehavior(
     }
 
     open fun onEdit(habit: Habit, date: LocalDate, x: Float, y: Float) {
-        // End the grace period as the popup opens, so the filters have applied by the time it closes
-        habit.id?.let { cache.endGracePeriod(it) }
+        // Keep the row while the popup is open; closing it applies the hide rules
+        habit.id?.let { cache.holdUntilEnded(it) }
+        val onDismiss = { habit.id?.let { cache.endGracePeriod(it) } ?: Unit }
         val entry = habit.computedEntries.get(date)
         if (habit.type == HabitType.NUMERICAL) {
             val oldValue = entry.value.toDouble() / 1000
-            screen.showNumberPopup(oldValue, entry.notes) { newValue: Double, newNotes: String ->
+            screen.showNumberPopup(oldValue, entry.notes, onDismiss) { newValue: Double, newNotes: String ->
                 val value = (newValue * 1000).roundToInt()
                 if (newValue != oldValue) {
                     if (
@@ -76,7 +77,8 @@ open class ListHabitsBehavior(
             screen.showCheckmarkPopup(
                 entry.value,
                 entry.notes,
-                habit.color
+                habit.color,
+                onDismiss
             ) { newValue: Int, newNotes: String ->
                 if (newValue != entry.value && newValue == YES_MANUAL) screen.showConfetti(habit.color, x, y)
                 commandRunner.run(CreateRepetitionCommand(habitList, habit, date, newValue, newNotes))
@@ -169,12 +171,14 @@ open class ListHabitsBehavior(
         fun showNumberPopup(
             value: Double,
             notes: String,
+            onDismiss: () -> Unit,
             callback: NumberPickerCallback
         )
         fun showCheckmarkPopup(
             selectedValue: Int,
             notes: String,
             color: PaletteColor,
+            onDismiss: () -> Unit,
             callback: CheckMarkDialogCallback
         )
         fun showSendBugReportToDeveloperScreen(log: String)

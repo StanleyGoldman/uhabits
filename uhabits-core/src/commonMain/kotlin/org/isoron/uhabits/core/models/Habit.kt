@@ -97,9 +97,11 @@ data class Habit(
             isNumerical = isNumerical,
             numericalHabitType = targetType,
             targetValue = targetValue,
+            assumeNone = assumeNone,
             computedEntries = computedEntries,
             from = from,
-            to = to
+            to = to,
+            today = today
         )
 
         streaks.recompute(

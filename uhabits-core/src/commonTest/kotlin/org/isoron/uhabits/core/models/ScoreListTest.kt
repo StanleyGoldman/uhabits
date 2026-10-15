@@ -199,6 +199,18 @@ class YesNoScoreListTest : BaseScoreListTest() {
     }
 
     @Test
+    fun skipsShouldNotLowerLaterScores() {
+        // A "6 times per week" habit with 4 skipped days: the days after the skips should
+        // not drop below the score the habit had before them
+        habit.frequency = Frequency(6, 7)
+        for (i in 10..13) addSkip(i)
+        for (i in 0..499) if (i !in 10..13) check(i)
+        habit.recompute()
+        val before = habit.scores[today.minus(14)].value
+        for (i in 0..13) assertTrue(habit.scores[today.minus(i)].value >= before - E)
+    }
+
+    @Test
     fun shouldAchieveHighScoreInReasonableTime() {
         // Daily habits should achieve at least 99% in 3 months
         habit = fixtures.createEmptyHabit()
@@ -340,7 +352,7 @@ class NumericalAtLeastScoreListTest : NumericalScoreListTest() {
         assertCloseTo(0.101149, habit.scores[today].value, E)
         habit.frequency = Frequency(1, 2)
         habit.recompute()
-        assertCloseTo(0.072631, habit.scores[today].value, E)
+        assertCloseTo(0.054816, habit.scores[today].value, E)
     }
 
     @Test
@@ -373,6 +385,19 @@ class NumericalAtLeastScoreListTest : NumericalScoreListTest() {
 
         addEntries(0, 500, 500)
         assertCloseTo(0.25, habit.scores[today].value, E)
+    }
+
+    @Test
+    fun test_irregularNonDaily() {
+        // If the user meets the weekly target each week, but on different weekdays,
+        // score should still converge to 100%
+        habit.frequency = Frequency.WEEKLY
+        for (k in 0..99) {
+            addEntry(14 * k, 2000)
+            addEntry(14 * k + 13, 2000)
+        }
+        habit.recompute()
+        assertCloseTo(1.0, habit.scores[today].value, 1e-3)
     }
 
     @Test
@@ -440,6 +465,19 @@ class NumericalAtLeastScoreListWithSkipTest : NumericalScoreListTest() {
         // skipped days should be treated as if they never existed
         assertCloseTo(initialScore, habit.scores[today].value, E)
     }
+
+    @Test
+    fun skipsShouldNotLowerLaterScoresOfWeeklyHabits() {
+        // "At least 7 miles per week", one mile every day except 4 skipped days: the days
+        // after the skips should not drop below the score the habit had before them
+        habit.frequency = Frequency.WEEKLY
+        habit.targetValue = 7.0
+        addEntries(10, 14, SKIP)
+        addEntries(14, 500, 1000)
+        addEntries(0, 10, 1000)
+        val before = habit.scores[today.minus(14)].value
+        for (i in 0..13) assertTrue(habit.scores[today.minus(i)].value >= before - E)
+    }
 }
 
 class NumericalAtMostScoreListTest : NumericalScoreListTest() {
@@ -498,7 +536,7 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
         assertCloseTo(0.898850, habit.scores[today].value, E)
         habit.frequency = Frequency(1, 2)
         habit.recompute()
-        assertCloseTo(0.927369, habit.scores[today].value, E)
+        assertCloseTo(0.954092, habit.scores[today].value, E)
     }
 
     @Test
@@ -508,6 +546,65 @@ class NumericalAtMostScoreListTest : NumericalScoreListTest() {
 
         addEntries(0, 500, 3500)
         assertCloseTo(0.25, habit.scores[today].value, E)
+    }
+
+    @Test
+    fun test_irregularNonDaily() {
+        // If the user stays within the weekly cap each week, but on different weekdays,
+        // score should stay at 100%
+        habit.frequency = Frequency.WEEKLY
+        for (k in 0..99) {
+            addEntry(14 * k, 2000)
+            addEntry(14 * k + 13, 2000)
+        }
+        habit.recompute()
+        assertCloseTo(1.0, habit.scores[today].value, 1e-3)
+    }
+
+    @Test
+    fun withoutAssumeNoneScoreShouldStartAtZero() {
+        habit.assumeNone = false
+        addEntries(0, 1, 0)
+        assertCloseTo(0.051922, habit.scores[today].value, E)
+    }
+
+    @Test
+    fun withoutAssumeNoneClosedDaysWithNothingEnteredShouldGradeZero() {
+        // Within the cap for 498 days, then nothing entered yesterday or today: yesterday
+        // grades 0, and today is still open, so it leaves the score unchanged
+        habit.assumeNone = false
+        addEntries(2, 500, 0)
+        assertCloseTo(1.0, habit.scores[today.minus(2)].value, E)
+        assertCloseTo(0.948078, habit.scores[today.minus(1)].value, E)
+        assertCloseTo(0.948078, habit.scores[today].value, E)
+    }
+
+    @Test
+    fun withAssumeNoneDaysWithNothingEnteredShouldBeMet() {
+        addEntries(2, 500, 0)
+        assertCloseTo(1.0, habit.scores[today.minus(1)].value, E)
+        assertCloseTo(1.0, habit.scores[today].value, E)
+    }
+
+    @Test
+    fun skipsShouldLowerTheCap() {
+        // "At most 2 per week" grades on 14 days against 4. With one skip in the window the
+        // cap scales to 4 × 13/14 ≈ 3.7, so 4 goes over it
+        habit.frequency = Frequency.WEEKLY
+        addEntries(1, 2, SKIP)
+        addEntries(0, 1, 4000)
+        assertTrue(habit.scores[today].value < 1.0)
+    }
+
+    @Test
+    fun skipsShouldAddNothingToTheWindow() {
+        // "At most 0 per week", nothing over the cap and one skipped day: the score
+        // should stay at 100%
+        habit.frequency = Frequency.WEEKLY
+        habit.targetValue = 0.0
+        addEntries(0, 100, 0)
+        addEntries(5, 6, SKIP)
+        assertCloseTo(1.0, habit.scores[today].value, E)
     }
 
     @Test

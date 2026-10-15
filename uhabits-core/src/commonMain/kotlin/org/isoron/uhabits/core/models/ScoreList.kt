@@ -61,6 +61,10 @@ class ScoreList {
 
     /**
      * Recomputes all scores between the provided [from] and [to] dates.
+     *
+     * With [assumeNone] off, an "at most" habit starts at zero, and a closed day (one before
+     * [today]) with nothing entered grades zero. Today and later days with nothing entered
+     * aren't closed yet, so they leave the score unchanged.
      */
     @Synchronized
     fun recompute(
@@ -68,71 +72,69 @@ class ScoreList {
         isNumerical: Boolean,
         numericalHabitType: NumericalHabitType,
         targetValue: Double,
+        assumeNone: Boolean,
         computedEntries: EntryList,
         from: LocalDate,
-        to: LocalDate
+        to: LocalDate,
+        today: LocalDate
     ) {
         map.clear()
-        var rollingSum = 0.0
-        var numerator = frequency.numerator
-        var denominator = frequency.denominator
         val freq = frequency.toDouble()
-        val values = computedEntries.getByInterval(from, to).map { it.value }.toIntArray()
-        val isAtMost = numericalHabitType == NumericalHabitType.AT_MOST
+        val isAtMost = isNumerical && numericalHabitType == NumericalHabitType.AT_MOST
+        val entries = computedEntries.getByInterval(from, to)
+            .map { it.toStateForm(isNumerical) }
+            .reversed()
 
-        // For non-daily boolean habits, we double the numerator and the denominator to smooth
-        // out irregular repetition schedules (for example, weekly habits performed on different
-        // days of the week)
-        if (!isNumerical && freq < 1.0) {
-            numerator *= 2
-            denominator *= 2
+        // What each day adds to the window: the amount ×1000 for numerical habits, one per
+        // manual check for boolean habits. Skips and unknown days add nothing.
+        val points = entries.map {
+            when {
+                isNumerical && it.state == Entry.AMOUNT -> max(0, it.amount!!).toLong()
+                !isNumerical && it.state == Entry.YES_MANUAL -> 1L
+                else -> 0L
+            }
         }
 
-        var previousValue = if (isNumerical && isAtMost) 1.0 else 0.0
-        for (i in values.indices) {
-            val offset = values.size - i - 1
-            if (isNumerical) {
-                rollingSum += max(0, values[offset])
-                if (offset + denominator < values.size) {
-                    rollingSum -= max(0, values[offset + denominator])
-                }
+        var windowLength = frequency.denominator
+        var windowTarget = if (isNumerical) targetValue * 1000 else frequency.numerator.toDouble()
 
-                val normalizedRollingSum = rollingSum / 1000
-                if (values[offset] != Entry.SKIP) {
-                    val percentageCompleted = if (!isAtMost) {
-                        if (targetValue > 0) {
-                            min(1.0, normalizedRollingSum / targetValue)
-                        } else {
-                            1.0
-                        }
-                    } else {
-                        if (targetValue > 0) {
-                            (1 - ((normalizedRollingSum - targetValue) / targetValue)).coerceIn(
-                                0.0,
-                                1.0
-                            )
-                        } else {
-                            if (normalizedRollingSum > 0) 0.0 else 1.0
-                        }
-                    }
+        // For non-daily habits, we double the window and its target to smooth out irregular
+        // repetition schedules (for example, weekly habits performed on different days of
+        // the week)
+        if (freq < 1.0) {
+            windowLength *= 2
+            windowTarget *= 2
+        }
 
-                    previousValue = compute(freq, previousValue, percentageCompleted)
-                }
-            } else {
-                if (values[offset] == Entry.YES_MANUAL) {
-                    rollingSum += 1.0
-                }
-                if (offset + denominator < values.size) {
-                    if (values[offset + denominator] == Entry.YES_MANUAL) {
-                        rollingSum -= 1.0
-                    }
-                }
-                if (values[offset] != Entry.SKIP) {
-                    val percentageCompleted = min(1.0, rollingSum / numerator)
-                    previousValue = compute(freq, previousValue, percentageCompleted)
-                }
+        var rollingSum = 0L
+        var rollingSkips = 0
+        val isNothingEnteredMissed = isAtMost && !assumeNone
+        var previousValue = if (isAtMost && assumeNone) 1.0 else 0.0
+        for (i in entries.indices) {
+            rollingSum += points[i]
+            if (entries[i].state == Entry.SKIP) rollingSkips++
+            if (i >= windowLength) {
+                rollingSum -= points[i - windowLength]
+                if (entries[i - windowLength].state == Entry.SKIP) rollingSkips--
             }
+
+            // Skipped days leave the score unchanged. The other days are graded against the
+            // target scaled down to the days in the window that aren't skips, so that skips
+            // don't take up slots in the window.
             val date = from.plus(i)
+            val isNothingEntered = entries[i].state == Entry.UNKNOWN
+            if (isNothingEnteredMissed && isNothingEntered) {
+                if (date.isOlderThan(today)) previousValue = compute(freq, previousValue, 0.0)
+            } else if (entries[i].state != Entry.SKIP) {
+                val daysThatCount = windowLength - rollingSkips
+                val percentageCompleted = if (windowTarget > 0) {
+                    val ratio = (rollingSum * windowLength) / (windowTarget * daysThatCount)
+                    if (isAtMost) (2 - ratio).coerceIn(0.0, 1.0) else min(1.0, ratio)
+                } else {
+                    if (isAtMost && rollingSum > 0) 0.0 else 1.0
+                }
+                previousValue = compute(freq, previousValue, percentageCompleted)
+            }
             map[date] = Score(date, previousValue)
         }
     }

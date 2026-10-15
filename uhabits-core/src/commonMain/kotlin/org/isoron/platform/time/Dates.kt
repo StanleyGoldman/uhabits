@@ -34,6 +34,25 @@ fun resetToday() {
     currentToday = null
 }
 
+private var firstWeekdaySource: (() -> DayOfWeek)? = null
+
+/**
+ * The user's first day of the week, which starts the calendar weeks that
+ * weekly measurable habits are judged by. Falls back to the locale's until
+ * [setFirstWeekday] names a source.
+ */
+fun getFirstWeekday(): DayOfWeek =
+    firstWeekdaySource?.invoke()
+        ?: DayOfWeek.entries[getFirstWeekdayNumberAccordingToLocale() - 1]
+
+/**
+ * Names where the first day of the week comes from, read afresh on every
+ * call so a change in settings applies at once.
+ */
+fun setFirstWeekday(source: () -> DayOfWeek) {
+    firstWeekdaySource = source
+}
+
 enum class DayOfWeek(val daysSinceSunday: Int) {
     SUNDAY(0),
     MONDAY(1),

@@ -26,7 +26,9 @@ import org.isoron.platform.io.TestDatabaseHelper
 import org.isoron.platform.io.UserFile
 import org.isoron.platform.io.createTestDatabaseOpenerSuspend
 import org.isoron.platform.io.createTestFileOpener
+import org.isoron.platform.time.DayOfWeek
 import org.isoron.platform.time.LocalDate
+import org.isoron.platform.time.setFirstWeekday
 import org.isoron.platform.time.setToday
 import org.isoron.uhabits.core.commands.CommandRunner
 import org.isoron.uhabits.core.models.HabitList
@@ -55,6 +57,7 @@ open class BaseUnitTest {
     @BeforeTest
     open fun setUp() {
         setToday(LocalDate(2015, 1, 25))
+        setFirstWeekday { DayOfWeek.SUNDAY }
         val memoryModelFactory = MemoryModelFactory()
         habitList = memoryModelFactory.buildHabitList()
         fixtures = HabitFixtures(memoryModelFactory, habitList)

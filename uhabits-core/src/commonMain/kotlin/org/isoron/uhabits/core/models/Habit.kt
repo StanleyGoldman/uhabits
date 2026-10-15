@@ -18,7 +18,10 @@
  */
 package org.isoron.uhabits.core.models
 
+import org.isoron.platform.time.LocalDate
+import org.isoron.platform.time.getFirstWeekday
 import org.isoron.platform.time.getToday
+import kotlin.math.roundToLong
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -60,28 +63,99 @@ data class Habit(
 
     fun hasReminder(): Boolean = reminder != null
 
-    fun todayStatus(): DayStatus {
-        val entry = computedEntries.get(getToday())
-        if (isNumerical) return measurableStatus(entry.toStateForm(isNumerical = true))
-        return when (entry.value) {
-            Entry.UNKNOWN -> DayStatus.OPEN
+    /**
+     * How the habit stands today. A weekly or monthly measurable habit is
+     * judged by its target period; an all-skipped period counts as met, as a
+     * skipped day does.
+     */
+    fun todayStatus(): DayStatus = statusOn(getToday()) ?: DayStatus.MET
+
+    /**
+     * How the habit stands on [date], judged as of today: a day, or the
+     * target period of a weekly or monthly measurable habit. Null when that
+     * period's days are all skipped, so it has no verdict.
+     */
+    fun statusOn(date: LocalDate): DayStatus? {
+        if (!isNumerical) return yesOrNoStatus(date)
+        val period = targetPeriod(date) ?: return measurableDayStatus(date)
+        return periodStatus(period)
+    }
+
+    private fun yesOrNoStatus(date: LocalDate): DayStatus {
+        return when (computedEntries.get(date).value) {
+            Entry.UNKNOWN -> if (date < getToday()) DayStatus.MISSED else DayStatus.OPEN
             Entry.NO -> DayStatus.MISSED
             else -> DayStatus.MET
         }
     }
 
-    private fun measurableStatus(entry: Entry): DayStatus {
+    private fun measurableDayStatus(date: LocalDate): DayStatus {
+        val entry = computedEntries.get(date).toStateForm(isNumerical = true)
         if (entry.state == Entry.SKIP) return DayStatus.MET
-        if (entry.state == Entry.UNKNOWN) return DayStatus.OPEN
-        val amount = (entry.amount ?: 0) / 1000.0
-        // A day is only missed below an "at least" target, or met under an
-        // "at most" cap, once it has closed, so today is never either.
-        return when (targetType) {
-            NumericalHabitType.AT_LEAST ->
-                if (amount >= targetValue) DayStatus.MET else DayStatus.OPEN
-            NumericalHabitType.AT_MOST ->
-                if (amount > targetValue) DayStatus.MISSED else DayStatus.OPEN
+        val isClosed = date < getToday()
+        if (entry.state == Entry.UNKNOWN) {
+            return when {
+                !isClosed -> DayStatus.OPEN
+                targetType == NumericalHabitType.AT_MOST && assumeNone -> DayStatus.MET
+                else -> DayStatus.MISSED
+            }
         }
+        return judge(entry.amount!!.toLong(), (targetValue * 1000).roundToLong(), isClosed)
+    }
+
+    /**
+     * Judges a total against a target or cap, both scaled to the same days.
+     * An "at least" total is met on reaching the target and missed only once
+     * closed; an "at most" total is missed on going over the cap and met only
+     * once closed.
+     */
+    private fun judge(total: Long, target: Long, isClosed: Boolean): DayStatus {
+        return when (targetType) {
+            NumericalHabitType.AT_LEAST -> when {
+                total >= target -> DayStatus.MET
+                isClosed -> DayStatus.MISSED
+                else -> DayStatus.OPEN
+            }
+            NumericalHabitType.AT_MOST -> when {
+                total > target -> DayStatus.MISSED
+                isClosed -> DayStatus.MET
+                else -> DayStatus.OPEN
+            }
+        }
+    }
+
+    /**
+     * The days whose total is judged against the target on [date]: the
+     * calendar week or month holding it, the rolling window of the last 7 or
+     * 30 days ending on it, or null for a daily habit.
+     */
+    private fun targetPeriod(date: LocalDate): ClosedRange<LocalDate>? {
+        val length = frequency.denominator
+        if (length != 7 && length != 30 && length != 31) return null
+        if (targetPeriodMode == TargetPeriodMode.ROLLING) return date.minus(length - 1)..date
+        return when (length) {
+            7 -> date.startOfWeek(getFirstWeekday()).let { it..it.plus(6) }
+            30, 31 -> date.startOfMonth().let { it..it.plus(it.monthLength - 1) }
+            else -> null
+        }
+    }
+
+    /**
+     * The verdict of a target period, or null when every day in it is
+     * skipped. A skipped day drops out, and the target scales to the days
+     * that count; days still to come count. Totals are compared as ×1000
+     * integers, `total × days` against `target × days that count`, so nothing
+     * rounds.
+     */
+    private fun periodStatus(period: ClosedRange<LocalDate>): DayStatus? {
+        val entries = computedEntries.getByInterval(period.start, period.endInclusive)
+            .map { it.toStateForm(isNumerical = true) }
+        val days = period.start.daysUntil(period.endInclusive) + 1L
+        val daysThatCount = days - entries.count { it.state == Entry.SKIP }
+        if (daysThatCount == 0L) return null
+        val total = entries.filter { it.state == Entry.AMOUNT }.sumOf { it.amount!!.toLong() }
+        val scaledTarget = (targetValue * 1000).roundToLong() * daysThatCount
+        return judge(total * days, scaledTarget, isClosed = period.endInclusive < getToday())
     }
 
     fun isEnteredToday(): Boolean {

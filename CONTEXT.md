@@ -101,7 +101,7 @@ _Avoid_: Numerical value, count
 Cycling a yes-or-no entry through its values with one gesture on the main list or a widget.
 
 **Day status**:
-How a habit stands on a day: **open** (still undecided), **met** or **missed**. A yes-or-no day is met by a yes (manual or auto) or a skip and missed by a no. A measurable day is met by a skip or by reaching an "at least" target, and missed by going over an "at most" cap; otherwise it stays open until the day closes. "Hide completed" hides habits met today, and sort by status puts them first.
+How a habit stands on a day: **open** (still undecided), **met** or **missed**. A yes-or-no day is met by a yes (manual or auto) or a skip and missed by a no. A daily measurable day is met by a skip or by reaching an "at least" target, and missed by going over an "at most" cap; otherwise it stays open until the day closes. A weekly or monthly measurable habit takes each day's status from its target period: an "at least" period is met once its total reaches the target and missed if it closes below; an "at most" period is missed once its total goes over the cap and met only when it closes at or under it. Skipped days drop out of the period and the target scales to the days left; a period of only skips has no verdict. "Hide completed" hides habits met today, and sort by status puts them first.
 _Avoid_: Completed, done, checked
 
 **Entered (today)**:
@@ -125,7 +125,7 @@ The day the app treats as current, which can be set to start at 3:00 AM instead 
 _Avoid_: Current date
 
 **First day of the week**:
-The user's chosen start of the week, used to lay out the calendar and group days into weeks.
+The user's chosen start of the week, used to lay out the calendar, group days into weeks, and start the calendar weeks a weekly measurable habit is judged by.
 
 ### Habit screen views
 

@@ -159,6 +159,27 @@ class HabitListTest : BaseUnitTest() {
         )
     }
 
+    @Test
+    fun testOrderByStatus_followsThePeriodVerdict() {
+        // A rolling week holding 2015-01-19..25 meets its target with no amount today.
+        val weekMet = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST).apply {
+            frequency = Frequency.WEEKLY
+            targetPeriodMode = TargetPeriodMode.ROLLING
+            targetValue = 10.0
+            originalEntries.add(Entry(getToday().minus(3), Entry.AMOUNT, 10000))
+            recompute()
+        }
+        val dayOpen = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
+            .withEntryToday(1000)
+
+        val list = modelFactory.buildHabitList().apply {
+            add(dayOpen)
+            add(weekMet)
+        }
+        list.primaryOrder = HabitList.Order.BY_STATUS_DESC
+        assertEquals(weekMet, list.getByPosition(0))
+    }
+
     private fun Habit.withEntryToday(value: Int): Habit {
         originalEntries.add(Entry(getToday(), value))
         recompute()

@@ -77,6 +77,7 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
 
 - Implementation ends with a pull request: after the review fixes are committed, push the branch and open a PR that closes the ticket (`Closes #<n>`). This extends the `implement` skill, which stops at the commit; it is user-invoked, so it never appears in your skill list.
 - Open pull requests and leave merging to a human; never merge one yourself.
+- File each out-of-scope finding (from a code review, or met along the way) as a `needs-triage` issue on the fork before the final report, and cite its number there; a finding exists for the user once it is filed.
 - Stage by explicit path (`git add <paths>`) and check `git status` before committing: untracked output from another branch (e.g. build output ignored only on that branch) survives `git switch`.
 - Leave remote branches to GitHub, which deletes a PR's head branch when it merges; cleanup after a merge covers only local branches and worktrees.
 - Before pushing to an existing PR's branch, check the PR is still open (`gh pr view <n> --json state`); once it has merged, put follow-ups on a fresh branch from `origin/main` and open a new PR.

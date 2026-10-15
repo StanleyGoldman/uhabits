@@ -59,7 +59,7 @@ class HabitBullCSVImporter(
 
         // First pass: any value above 1 makes the habit measurable, so the
         // type is known before any of its entries are written.
-        val numericalNames = rows.filter { it.value > 1 }.map { it.name }.toSet()
+        val measurableNames = rows.filter { it.value > 1 }.map { it.name }.toSet()
 
         val map = HashMap<String, Habit>()
         for (row in rows) {
@@ -69,20 +69,20 @@ class HabitBullCSVImporter(
                 h.name = row.name
                 h.description = row.description
                 h.frequency = Frequency.DAILY
-                if (row.name in numericalNames) {
-                    logger.info("Found a value above 1, considering this habit as numerical.")
+                if (row.name in measurableNames) {
+                    logger.info("Found a value above 1, considering this habit as measurable.")
                     h.type = HabitType.NUMERICAL
                 }
                 habitList.add(h)
                 map[row.name] = h
                 logger.info("Creating habit: ${row.name}")
             }
-            val entry = if (h.isNumerical) {
-                Entry(row.date, Entry.AMOUNT, row.value * 1000, row.notes)
-            } else if (row.value == 1) {
-                Entry(row.date, Entry.YES_MANUAL, null, row.notes)
-            } else {
-                Entry(row.date, Entry.NO, null, row.notes)
+            // In a yes-or-no habit anything but 1 is NO: parseInt already turns
+            // an unparseable value into 0, so it can't be told apart from one.
+            val entry = when {
+                h.isNumerical -> Entry(row.date, Entry.AMOUNT, row.value * 1000, row.notes)
+                row.value == 1 -> Entry(row.date, Entry.YES_MANUAL, null, row.notes)
+                else -> Entry(row.date, Entry.NO, null, row.notes)
             }
             h.originalEntries.add(entry)
         }

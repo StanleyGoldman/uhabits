@@ -99,7 +99,7 @@ A habit whose today's entry is a yes, a skip, or meets an "at least" target. Use
 _Avoid_: Done, checked
 
 **Entered (today)**:
-A habit whose today's entry is anything other than unknown. Used by "Hide entered".
+A habit for which the user recorded something today: a yes, a no, a skip or an amount. Unknown and Yes (auto) are not entered. Used by "Hide entered".
 
 ### Progress
 

@@ -105,11 +105,12 @@ class ListHabitsRegressionTest : BaseUserInterfaceTest() {
         longPressCheckmarks("Read books", count = 2)
         longPressCheckmarks("Read books", count = 1)
         verifyDisplaysCheckmarks("Meditate", listOf(YES_AUTO, YES_MANUAL, YES_AUTO, YES_MANUAL))
+        // Read books, Track time and Meditate are all met today, so their score orders them
         CommonSteps.verifyDisplaysTextInSequence(
             "Wake up early",
             "Read books",
-            "Meditate",
-            "Track time"
+            "Track time",
+            "Meditate"
         )
 
         changeFrequencyToDaily("Meditate")

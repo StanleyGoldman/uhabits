@@ -141,7 +141,7 @@ class HabitListTest : BaseUnitTest() {
     fun testOrderByStatus_ranksMetHabitsFirst() {
         val no = fixtures.createEmptyHabit("No").withEntryToday(Entry.NO)
         val underCap = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_MOST)
-            .withEntryToday(1)
+            .withAmountToday(1)
         val yes = fixtures.createEmptyHabit("Yes").withEntryToday(Entry.YES_MANUAL)
         val measurableSkip = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
             .withEntryToday(Entry.SKIP)
@@ -154,7 +154,7 @@ class HabitListTest : BaseUnitTest() {
         }
         list.primaryOrder = HabitList.Order.BY_STATUS_DESC
         assertEquals(
-            listOf(measurableSkip, yes, underCap, no),
+            listOf(measurableSkip, yes, no, underCap),
             (0 until list.size()).map { list.getByPosition(it) }
         )
     }
@@ -170,7 +170,7 @@ class HabitListTest : BaseUnitTest() {
             recompute()
         }
         val dayOpen = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
-            .withEntryToday(1000)
+            .withAmountToday(1000)
 
         val list = modelFactory.buildHabitList().apply {
             add(dayOpen)
@@ -180,8 +180,56 @@ class HabitListTest : BaseUnitTest() {
         assertEquals(weekMet, list.getByPosition(0))
     }
 
-    private fun Habit.withEntryToday(value: Int): Habit {
-        originalEntries.add(Entry(getToday(), value))
+    @Test
+    fun testOrderByStatus_defaultOrderPutsOpenThenMissedThenMet() {
+        val overCap = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_MOST)
+            .withAmountToday(1_000_000)
+        val yes = fixtures.createEmptyHabit("Yes").withEntryToday(Entry.YES_MANUAL)
+        val unknown = fixtures.createEmptyHabit("Unknown")
+
+        val list = modelFactory.buildHabitList().apply {
+            add(yes)
+            add(overCap)
+            add(unknown)
+        }
+        list.primaryOrder = HabitList.Order.BY_STATUS_ASC
+        assertEquals(DayStatus.MISSED, overCap.todayStatus(), "setup")
+        assertEquals(DayStatus.OPEN, unknown.todayStatus(), "setup")
+        assertEquals(
+            listOf(unknown, overCap, yes),
+            (0 until list.size()).map { list.getByPosition(it) }
+        )
+    }
+
+    @Test
+    fun testOrderByStatus_leavesHabitsOfTheSameStatusToTheSecondaryOrder() {
+        val little = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
+            .apply { name = "A little" }
+            .withAmountToday(500)
+        val more = fixtures.createEmptyNumericalHabit(NumericalHabitType.AT_LEAST)
+            .apply { name = "B more" }
+            .withAmountToday(1500)
+
+        val list = modelFactory.buildHabitList().apply {
+            add(more)
+            add(little)
+        }
+        list.primaryOrder = HabitList.Order.BY_STATUS_DESC
+        list.secondaryOrder = HabitList.Order.BY_NAME_ASC
+        assertEquals(
+            listOf(little, more),
+            (0 until list.size()).map { list.getByPosition(it) }
+        )
+    }
+
+    private fun Habit.withEntryToday(state: Int): Habit {
+        originalEntries.add(Entry(getToday(), state))
+        recompute()
+        return this
+    }
+
+    private fun Habit.withAmountToday(amount: Int): Habit {
+        originalEntries.add(Entry(getToday(), Entry.AMOUNT, amount))
         recompute()
         return this
     }

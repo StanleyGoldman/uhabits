@@ -222,6 +222,38 @@ class HabitListTest : BaseUnitTest() {
         )
     }
 
+    @Test
+    fun testOrderByScore_descendingPutsHighestFirstAndAscendingLowestFirst() {
+        // Names sort High, Low, Mid: neither score order, so the name fallback can't pass it
+        val high = fixtures.createEmptyHabit("High").withYesOnLastDays(60)
+        val mid = fixtures.createEmptyHabit("Mid").withYesOnLastDays(10)
+        val low = fixtures.createEmptyHabit("Low")
+
+        val list = modelFactory.buildHabitList().apply {
+            add(low)
+            add(high)
+            add(mid)
+        }
+        list.primaryOrder = HabitList.Order.BY_SCORE_DESC
+        assertEquals(
+            listOf(high, mid, low),
+            (0 until list.size()).map { list.getByPosition(it) }
+        )
+        list.primaryOrder = HabitList.Order.BY_SCORE_ASC
+        assertEquals(
+            listOf(low, mid, high),
+            (0 until list.size()).map { list.getByPosition(it) }
+        )
+    }
+
+    private fun Habit.withYesOnLastDays(days: Int): Habit {
+        for (offset in 0 until days) {
+            originalEntries.add(Entry(getToday().minus(offset), Entry.YES_MANUAL))
+        }
+        recompute()
+        return this
+    }
+
     private fun Habit.withEntryToday(state: Int): Habit {
         originalEntries.add(Entry(getToday(), state))
         recompute()

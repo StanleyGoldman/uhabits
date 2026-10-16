@@ -128,7 +128,7 @@ open class MemoryHabitList : HabitList {
         val scoreComparatorDesc =
             Comparator<Habit> { habit1, habit2 ->
                 val today = org.isoron.platform.time.getToday()
-                habit1.scores[today].value.compareTo(habit2.scores[today].value)
+                habit2.scores[today].value.compareTo(habit1.scores[today].value)
             }
         val scoreComparatorAsc =
             Comparator { h1: Habit, h2: Habit -> scoreComparatorDesc.compare(h2, h1) }

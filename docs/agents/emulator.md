@@ -6,6 +6,7 @@ A hand check drives the real app on this machine's Android emulator and reads wh
 
 - `adb` is at `$ANDROID_HOME/platform-tools/adb`, not on `PATH`, and the emulator at `$ANDROID_HOME/emulator/emulator`.
 - Hand checks use the `Medium_Phone_API_37.0` image. `uhabitsTest34` belongs to the screenshot tests (`docs/agents/screenshot-tests.md`), which boot it on port 6340.
+- Run `adb devices` before booting. An emulator already listed belongs to another session, which can force-stop, reinstall or shut down the app mid-check. A force-stop cancels the app's notifications, so a reminder that vanishes is the tell. Leave that device and its app data alone: boot a second instance with `-read-only -port 5556` added (it then shows up as `emulator-5556`), or ask the user. Without `-read-only`, a second boot of the same AVD exits with "Running multiple emulators with the same AVD is an experimental feature".
 - Boot it headless as a background command: `emulator -avd Medium_Phone_API_37.0 -no-window -no-audio -no-snapshot-save`. Wait with `adb wait-for-device`, then loop until `adb shell getprop sys.boot_completed` prints `1`.
 - Pass `-s emulator-5554` (your serial, from `adb devices`) on every `adb` call. Another session's emulator, such as the screenshot tests' `emulator-6340`, can appear mid-run, and a bare `adb` then fails with "more than one device".
 - Build with `./gradlew :uhabits-android:assembleDebug` and install with `adb install -r uhabits-android/build/outputs/apk/debug/uhabits-android-debug.apk`.

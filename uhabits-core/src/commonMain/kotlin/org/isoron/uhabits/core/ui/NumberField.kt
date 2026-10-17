@@ -27,7 +27,23 @@ import kotlin.math.roundToLong
  * day. [isSkipped] asks the dialog to hint "Skipped".
  */
 data class NumberField(val text: String, val isSkipped: Boolean) {
+    /** [text] as the field shows it in a locale whose decimal separator is [separator]. */
+    fun localText(separator: Char): String =
+        if (separator == ',') text.replace('.', ',') else text
+
     companion object {
+        /**
+         * Whether the field may hold [text]: digits and at most one decimal
+         * separator, typed as "." or "," whatever the locale, since keyboards
+         * don't always offer the locale's one.
+         */
+        fun accepts(text: String): Boolean =
+            text.all { it in ACCEPTED_CHARS } && text.count { it in SEPARATORS } <= 1
+
+        /** The characters the field takes: digits and either decimal separator. */
+        const val ACCEPTED_CHARS = "0123456789.,"
+        private const val SEPARATORS = ".,"
+
         fun of(entry: Entry): NumberField {
             val amount = entry.amount
                 ?: return NumberField("", isSkipped = entry.state == Entry.SKIP)

@@ -3,13 +3,13 @@ package org.isoron.uhabits.activities.common.dialogs
 import android.app.Dialog
 import android.content.DialogInterface
 import android.os.Bundle
-import android.provider.Settings
-import android.text.method.DigitsKeyListener
+import android.text.InputFilter
+import android.text.InputType
+import android.text.method.NumberKeyListener
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
-import android.view.inputmethod.EditorInfo
 import androidx.appcompat.app.AppCompatDialogFragment
 import org.isoron.uhabits.HabitsApplication
 import org.isoron.uhabits.R
@@ -48,11 +48,14 @@ class NumberDialog : AppCompatDialogFragment() {
         if (!prefs.isSkipEnabled) view.skipBtnNumber.visibility = View.GONE
         if (!prefs.areQuestionMarksEnabled) view.unknownBtnNumber.visibility = View.GONE
         view.numberButtons.visibility = View.VISIBLE
-        fixDecimalSeparator(view)
         originalNotes = requireArguments().getString(ARG_NOTES)!!
-        originalText = requireArguments().getString(ARG_TEXT)!!.replace('.', separator)
+        originalText = NumberField(requireArguments().getString(ARG_TEXT)!!, isSkipped = false)
+            .localText(separator)
         view.notes.setText(originalNotes)
+        // Filled before the filter, so an amount the field can't take as typed
+        // (a negative one, say) still shows, and saving it untouched keeps it.
         view.value.setText(originalText)
+        acceptEitherSeparator(view)
         if (requireArguments().getBoolean(ARG_SKIPPED)) view.value.setHint(R.string.skipped)
         view.value.setOnKeyListener { _, keyCode, event ->
             if (event.action == MotionEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -97,18 +100,22 @@ class NumberDialog : AppCompatDialogFragment() {
         onDismiss()
     }
 
-    private fun fixDecimalSeparator(view: CheckmarkPopupBinding) {
-        // https://stackoverflow.com/a/34256139
-        view.value.keyListener = DigitsKeyListener.getInstance("0123456789$separator")
-
-        // https://github.com/flutter/flutter/issues/61175
-        val currKeyboard = Settings.Secure.getString(
-            requireContext().contentResolver,
-            Settings.Secure.DEFAULT_INPUT_METHOD
-        )
-        if (currKeyboard.contains("swiftkey") || currKeyboard.contains("samsung")) {
-            view.value.inputType = EditorInfo.TYPE_CLASS_TEXT
+    private fun acceptEitherSeparator(view: CheckmarkPopupBinding) {
+        // Keyboards differ in which separator they offer, and in landscape the
+        // fullscreen editor commits text without key events, so a filter on
+        // the whole text decides; the listener keeps the numeric keypad.
+        view.value.keyListener = object : NumberKeyListener() {
+            override fun getInputType() =
+                InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            override fun getAcceptedChars() = NumberField.ACCEPTED_CHARS.toCharArray()
         }
+        view.value.filters = arrayOf(
+            InputFilter { source, start, end, dest, dstart, dend ->
+                val text = dest.replaceRange(dstart, dend, source.subSequence(start, end))
+                val isDeletion = start == end
+                if (isDeletion || NumberField.accepts(text.toString())) null else dest.subSequence(dstart, dend)
+            }
+        )
     }
 
     fun save(input: NumberInput = NumberInput.Typed(view.value.text.toString())) {

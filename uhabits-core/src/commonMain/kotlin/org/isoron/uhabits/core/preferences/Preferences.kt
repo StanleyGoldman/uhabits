@@ -190,6 +190,29 @@ open class Preferences(private val storage: Storage) {
         const val MIDNIGHT_DELAY_HOURS = 3
     }
 
+    /**
+     * The reminder last shown for a habit, kept so that a sticky reminder can
+     * be reposted after the app process is killed. Null once the reminder is
+     * cleared, e.g. because the habit was answered.
+     */
+    open fun getLastShownReminder(habitId: Long): ShownReminder? {
+        val value = storage.getString(lastShownReminderKey(habitId), "")
+        if (value.isEmpty()) return null
+        val (days, reminderTime) = value.split(":")
+        return ShownReminder(LocalDate(days.toInt()), reminderTime.toLong())
+    }
+
+    open fun setLastShownReminder(habitId: Long, reminder: ShownReminder) {
+        val value = "${reminder.date.daysSince2000}:${reminder.reminderTime}"
+        storage.putString(lastShownReminderKey(habitId), value)
+    }
+
+    open fun clearLastShownReminder(habitId: Long) {
+        storage.remove(lastShownReminderKey(habitId))
+    }
+
+    private fun lastShownReminderKey(habitId: Long) = "last_shown_reminder_$habitId"
+
     open fun updateLastHint(number: Int, date: LocalDate) {
         storage.putInt("last_hint_number", number)
         storage.putLong("last_hint_timestamp", date.unixTime)

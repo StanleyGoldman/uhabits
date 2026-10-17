@@ -19,6 +19,7 @@
 package org.isoron.uhabits.core.ui
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -40,5 +41,18 @@ class NumberFieldTest {
     fun testAccepts_onlyOneSeparator() {
         assertFalse(NumberField.accepts("1.5.2"))
         assertFalse(NumberField.accepts("1,5.2"))
+    }
+
+    @Test
+    fun testAccepts_anEmptyField() {
+        assertTrue(NumberField.accepts(""))
+    }
+
+    @Test
+    fun testLocalText_usesACommaOnlyWhereTheLocaleDoes() {
+        val field = NumberField("1.5", isSkipped = false)
+        assertEquals("1,5", field.localText(','))
+        assertEquals("1.5", field.localText('.'))
+        assertEquals("1.5", field.localText('\u066B'))
     }
 }

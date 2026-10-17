@@ -48,11 +48,14 @@ class NumberDialog : AppCompatDialogFragment() {
         if (!prefs.isSkipEnabled) view.skipBtnNumber.visibility = View.GONE
         if (!prefs.areQuestionMarksEnabled) view.unknownBtnNumber.visibility = View.GONE
         view.numberButtons.visibility = View.VISIBLE
-        acceptEitherSeparator(view)
         originalNotes = requireArguments().getString(ARG_NOTES)!!
-        originalText = requireArguments().getString(ARG_TEXT)!!.replace('.', separator)
+        originalText = NumberField(requireArguments().getString(ARG_TEXT)!!, isSkipped = false)
+            .localText(separator)
         view.notes.setText(originalNotes)
+        // Filled before the filter, so an amount the field can't take as typed
+        // (a negative one, say) still shows, and saving it untouched keeps it.
         view.value.setText(originalText)
+        acceptEitherSeparator(view)
         if (requireArguments().getBoolean(ARG_SKIPPED)) view.value.setHint(R.string.skipped)
         view.value.setOnKeyListener { _, keyCode, event ->
             if (event.action == MotionEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -104,12 +107,13 @@ class NumberDialog : AppCompatDialogFragment() {
         view.value.keyListener = object : NumberKeyListener() {
             override fun getInputType() =
                 InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-            override fun getAcceptedChars() = "0123456789.,".toCharArray()
+            override fun getAcceptedChars() = NumberField.ACCEPTED_CHARS.toCharArray()
         }
         view.value.filters = arrayOf(
             InputFilter { source, start, end, dest, dstart, dend ->
                 val text = dest.replaceRange(dstart, dend, source.subSequence(start, end))
-                if (NumberField.accepts(text.toString())) null else dest.subSequence(dstart, dend)
+                val isDeletion = start == end
+                if (isDeletion || NumberField.accepts(text.toString())) null else dest.subSequence(dstart, dend)
             }
         )
     }

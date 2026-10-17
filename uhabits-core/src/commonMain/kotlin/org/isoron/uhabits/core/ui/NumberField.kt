@@ -28,6 +28,16 @@ import kotlin.math.roundToLong
  */
 data class NumberField(val text: String, val isSkipped: Boolean) {
     companion object {
+        /**
+         * Whether the field may hold [text]: digits and at most one decimal
+         * separator, typed as "." or "," whatever the locale, since keyboards
+         * don't always offer the locale's one.
+         */
+        fun accepts(text: String): Boolean =
+            text.all { it in '0'..'9' || it in SEPARATORS } && text.count { it in SEPARATORS } <= 1
+
+        private const val SEPARATORS = ".,"
+
         fun of(entry: Entry): NumberField {
             val amount = entry.amount
                 ?: return NumberField("", isSkipped = entry.state == Entry.SKIP)

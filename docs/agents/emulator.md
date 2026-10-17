@@ -6,11 +6,11 @@ A hand check drives the real app on this machine's Android emulator and reads wh
 
 - `adb` is at `$ANDROID_HOME/platform-tools/adb`, not on `PATH`, and the emulator at `$ANDROID_HOME/emulator/emulator`.
 - Hand checks use the `Medium_Phone_API_37.0` image. `uhabitsTest34` belongs to the screenshot tests (`docs/agents/screenshot-tests.md`), which boot it on port 6340.
-- Several sessions on this machine run hand checks, and each needs an emulator of its own: a session that finds `emulator-5554` already up will drive it as its own, rotating the screen, restarting the app and killing the emulator mid-check. Boot a private instance on a port no other session picks, with `-read-only` so it can run beside another instance of the same AVD: `emulator -avd Medium_Phone_API_37.0 -no-window -no-audio -no-snapshot-save -read-only -port <even port, 5560-5680>`, as a background command. Its serial is `emulator-<port>`. Wait with `adb -s <serial> wait-for-device`, then loop until `adb -s <serial> shell getprop sys.boot_completed` prints `1`.
-- `-read-only` boots from the device as the last writable boot left it and drops your changes when it stops, so install your build on each boot.
+- Several sessions on this machine run hand checks at once, so each boots and drives an emulator of its own. Build with `./gradlew :uhabits-android:assembleDebug`, then boot with `.claude/scripts/emulator-up.sh --apk uhabits-android/build/outputs/apk/debug/uhabits-android-debug.apk`. It waits for the boot, installs the APK and prints your `serial`; its header lists the failure statuses.
+- Your serial is the one the script printed. A device in `adb devices` that you didn't boot belongs to another session, mid-check.
+- The script boots `-read-only`, so the device drops your changes, your install included, when it stops. Reinstall with `adb -s <serial> install -r <apk>` after each rebuild.
 - Pass `-s <serial>` on every `adb` call. Other sessions' emulators, such as the screenshot tests' `emulator-6340`, come and go mid-run, and a bare `adb` then fails with "more than one device".
-- Your commands are the only ones on a private serial. If the screen changes on its own, `adb -s <serial> logcat -d | grep "adbd service requested"` lists every shell command the device received; one you didn't send means another session has found it.
-- Build with `./gradlew :uhabits-android:assembleDebug` and install with `adb install -r uhabits-android/build/outputs/apk/debug/uhabits-android-debug.apk`.
+- If the screen changes on its own, `adb -s <serial> logcat -d | grep "adbd service requested"` lists every shell command the device received; one you didn't send means another session is driving it.
 - Stop it with `adb -s <serial> emu kill` once the check is done.
 
 ## Reaching a screen

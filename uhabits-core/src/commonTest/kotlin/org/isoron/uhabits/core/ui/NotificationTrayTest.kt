@@ -21,6 +21,11 @@ package org.isoron.uhabits.core.ui
 import org.isoron.platform.time.LocalDate
 import org.isoron.platform.time.getToday
 import org.isoron.uhabits.core.BaseUnitTest
+import org.isoron.uhabits.core.commands.ArchiveHabitsCommand
+import org.isoron.uhabits.core.commands.Command
+import org.isoron.uhabits.core.commands.CreateRepetitionCommand
+import org.isoron.uhabits.core.commands.DeleteHabitsCommand
+import org.isoron.uhabits.core.commands.EditHabitCommand
 import org.isoron.uhabits.core.models.DayStatus
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Frequency
@@ -32,19 +37,73 @@ import org.isoron.uhabits.core.models.TargetPeriodMode
 import org.isoron.uhabits.core.models.WeekdayList
 import org.isoron.uhabits.core.preferences.MemoryStorage
 import org.isoron.uhabits.core.preferences.Preferences
+import org.isoron.uhabits.core.preferences.ShownReminder
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class NotificationTrayTest : BaseUnitTest() {
     private lateinit var systemTray: FakeSystemTray
+    private lateinit var prefs: Preferences
     private lateinit var tray: NotificationTray
 
     @BeforeTest
     override fun setUp() {
         super.setUp()
         systemTray = FakeSystemTray()
-        tray = NotificationTray(taskRunner, commandRunner, Preferences(MemoryStorage()), systemTray)
+        prefs = Preferences(MemoryStorage())
+        tray = NotificationTray(taskRunner, commandRunner, prefs, systemTray)
+    }
+
+    @Test
+    fun coldStart_reshowRepostsWithTheOriginalDayAndTime() {
+        val habit = buildListedHabit()
+        val date = getToday()
+        tray.show(habit, date, 1234L)
+
+        val freshSystemTray = FakeSystemTray()
+        val freshTray = NotificationTray(taskRunner, commandRunner, prefs, freshSystemTray)
+        freshTray.reshow(habit)
+
+        assertEquals(listOf(Posted(habit, date, 1234L)), freshSystemTray.posted)
+    }
+
+    @Test
+    fun answeredToday_clearsTheShownReminderSoAFreshTrayDoesNotRepost() {
+        val habit = assertShownReminderClearedBy {
+            CreateRepetitionCommand(habitList, it, getToday(), Entry.YES_MANUAL, null, "")
+        }
+        val freshSystemTray = FakeSystemTray()
+        NotificationTray(taskRunner, commandRunner, prefs, freshSystemTray).reshow(habit)
+        assertEquals(emptyList(), freshSystemTray.posted)
+    }
+
+    @Test
+    fun quietReminder_isNotSavedAsShown() {
+        val habit = buildListedHabit().withEntryToday(Entry.NO)
+        tray.show(habit, getToday(), 1234L)
+        assertNull(prefs.getLastShownReminder(habit.id!!))
+    }
+
+    @Test
+    fun deletingTheHabit_clearsTheShownReminder() {
+        assertShownReminderClearedBy { DeleteHabitsCommand(habitList, listOf(it)) }
+    }
+
+    @Test
+    fun archivingTheHabit_clearsTheShownReminder() {
+        assertShownReminderClearedBy { ArchiveHabitsCommand(habitList, listOf(it)) }
+    }
+
+    @Test
+    fun removingTheReminder_clearsTheShownReminder() {
+        assertShownReminderClearedBy { habit ->
+            val modified = modelFactory.buildHabit()
+            modified.copyFrom(habit)
+            modified.reminder = null
+            EditHabitCommand(habitList, habit.id!!, modified)
+        }
     }
 
     @Test
@@ -159,6 +218,20 @@ class NotificationTrayTest : BaseUnitTest() {
         assertReminderShown(true, habit.withAmount(4.0))
     }
 
+    private fun assertShownReminderClearedBy(buildCommand: (Habit) -> Command): Habit {
+        val habit = buildListedHabit()
+        tray.show(habit, getToday(), 1234L)
+        val id = habit.id!!
+        assertEquals(ShownReminder(getToday(), 1234L), prefs.getLastShownReminder(id), "setup")
+
+        val command = buildCommand(habit)
+        command.run()
+        tray.onCommandFinished(command)
+
+        assertNull(prefs.getLastShownReminder(id))
+        return habit
+    }
+
     private fun assertReminderShown(expected: Boolean, habit: Habit) {
         tray.show(habit, getToday(), 0)
         assertEquals(expected, systemTray.shown.contains(habit))
@@ -168,6 +241,12 @@ class NotificationTrayTest : BaseUnitTest() {
         val habit = modelFactory.buildHabit()
         habit.reminder = Reminder(8, 30, WeekdayList.EVERY_DAY)
         habit.recompute()
+        return habit
+    }
+
+    private fun buildListedHabit(): Habit {
+        val habit = buildHabit()
+        habitList.add(habit)
         return habit
     }
 
@@ -200,11 +279,14 @@ class NotificationTrayTest : BaseUnitTest() {
         return this
     }
 
+    private data class Posted(val habit: Habit, val date: LocalDate, val reminderTime: Long)
+
     private class FakeSystemTray : NotificationTray.SystemTray {
-        val shown = mutableListOf<Habit>()
+        val posted = mutableListOf<Posted>()
+        val shown get() = posted.map { it.habit }
         override fun removeNotification(notificationId: Int) {}
         override fun showNotification(habit: Habit, notificationId: Int, date: LocalDate, reminderTime: Long) {
-            shown.add(habit)
+            posted.add(Posted(habit, date, reminderTime))
         }
         override fun log(msg: String) {}
     }
